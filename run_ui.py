@@ -1,6 +1,6 @@
 # Script to launch the local Pygame window
 
-from viz.radar_ui import run_radar_ui
+from viz.visualizer import run_radar_ui
 
 def main():
     print("Launching ATC Radar Visualization...")
