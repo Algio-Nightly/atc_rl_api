@@ -22,7 +22,7 @@ class SimulationEngine:
         # Event tracking (for rewards/penalties)
         self.event_buffer = []
 
-    async def run(self):
+    async def run(self, on_step=None):
         """Main background simulation loop"""
         self.is_active = True
         last_time = time.perf_counter()
@@ -37,6 +37,11 @@ class SimulationEngine:
             
             if not self.is_terminal:
                 self.step(dt)
+                
+            # Real-time state broadcasting/reporting hook
+            if on_step and not self.is_terminal:
+                state = self.get_full_state()
+                await on_step(state)
             
             # Sleep to maintain tick rate (adjusting for execution time)
             execution_time = time.perf_counter() - current_time

@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from atc_rl_api.core.engine import SimulationEngine
 from atc_rl_api.api.schemas import (
     FullSimulationState, 
@@ -12,17 +12,40 @@ from atc_rl_api.api.schemas import (
     CommandType
 )
 
+class ConnectionManager:
+    """Manages active WebSocket connections for real-time state broadcasting."""
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: dict):
+        # Broadcast the JSON state to all connected clients
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except Exception:
+                # Handle connection issues gracefully (e.g. client closed without explicit disconnect)
+                pass
+
+manager = ConnectionManager()
 # Global simulation instance
 engine = SimulationEngine()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Start the simulation background task
-    task = asyncio.create_task(engine.run())
+    # Initialize background simulation task with WebSocket broadcaster callback
+    task = asyncio.create_task(engine.run(on_step=manager.broadcast))
     yield
     # Stop the simulation
     engine.is_active = False
-    await task
+    task.cancel()
 
 app = FastAPI(title="ATC RL API", lifespan=lifespan)
 
@@ -36,6 +59,20 @@ async def reset_simulation():
     """Wipe the simulation back to zero state"""
     engine.reset_environment()
     return {"status": "Simulation reset"}
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """Real-time simulation state stream."""
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Keep connection alive; clients can send 'heartbeat' text if they want
+            # but we mostly use this for server-side push.
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception:
+        manager.disconnect(websocket)
 
 @app.post("/spawn")
 async def spawn_aircraft(request: SpawnRequest):
