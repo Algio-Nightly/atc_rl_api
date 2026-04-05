@@ -10,8 +10,8 @@ export const mockData = {
       callsign: "UA123",
       type: "B738",
       weight_class: "Medium",
-      x: 40.7128,
-      y: -74.0060,
+      x: 3.0,
+      y: 5.0,
       altitude: 12000,
       heading: 85.0,
       target_heading: 90.0,
@@ -22,14 +22,15 @@ export const mockData = {
       emergency_index: 0,
       active_star: "STAR_ALPHA",
       wp_index: 2,
-      is_holding: false
+      is_holding: false,
+      history: [[2.5, 4.8], [2.8, 4.9]]
     },
     "DL456": {
       callsign: "DL456",
       type: "A320",
       weight_class: "Medium",
-      x: 40.6500,
-      y: -73.9000,
+      x: -2.0,
+      y: -1.5,
       altitude: 5000,
       heading: 120.0,
       target_heading: 120.0,
@@ -40,7 +41,8 @@ export const mockData = {
       emergency_index: 1,
       active_star: null,
       wp_index: 1,
-      is_holding: true
+      is_holding: true,
+      history: [[-2.2, -1.2], [-2.1, -1.35]]
     }
   },
   events: [
@@ -55,5 +57,13 @@ export const mockData = {
     edges: [
       { from: "WPT_ALPHA", to: "WPT_BRAVO" }
     ]
-  }
+  },
+  airports: [
+    {
+      name: "Coimbatore (VLB)",
+      lat: 11.030288,
+      lon: 77.039218,
+      runways: []
+    }
+  ]
 };

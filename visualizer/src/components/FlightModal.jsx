@@ -1,4 +1,5 @@
 import React from 'react';
+import { xyToLatLon } from '../utils/geo';
 
 export default function FlightModal({ flight, onClose }) {
   if (!flight) return null;
@@ -12,6 +13,7 @@ export default function FlightModal({ flight, onClose }) {
         </div>
         <div className="modal-body">
           <p><strong>Call Sign:</strong> {flight.callsign} ({flight.type} | {flight.weight_class})</p>
+          <p><strong>Location:</strong> {xyToLatLon(flight.x, flight.y).map(val => val.toFixed(6)).join(', ')}</p>
           <p><strong>State:</strong> {flight.state} {flight.is_holding ? "(Hold)" : ""}</p>
           <p><strong>Altitude:</strong> {flight.altitude} ft</p>
           <p><strong>Heading:</strong> {flight.heading}° (Target: {flight.target_heading}°)</p>
