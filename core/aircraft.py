@@ -94,10 +94,18 @@ class Aircraft:
                 pass
 
             elif self.active_star and self.active_star in stars:
-                # 0d. STAR Navigation Logic
-                waypoints = stars[self.active_star]
-                if self.wp_index < len(waypoints):
-                    wp = waypoints[self.wp_index]
+                # 0d. STAR Navigation Logic (Multi-Runway Aware)
+                routes = stars[self.active_star]
+                if not routes:
+                    self.active_star = None
+                    return
+
+                # Pick a route (usually the first one if we don't have a runway assignment)
+                # TODO: Support explicit runway assignments
+                selected_route = routes[0]["waypoints"]
+                
+                if self.wp_index < len(selected_route):
+                    wp = selected_route[self.wp_index]
                     self.target_alt = wp["target_alt"]
                     self.target_speed = wp["target_speed"]
                     
@@ -107,7 +115,7 @@ class Aircraft:
                     
                     if math.sqrt(dx**2 + dy**2) < 2.0:
                         self.wp_index += 1
-                        if self.wp_index >= len(waypoints):
+                        if self.wp_index >= len(selected_route):
                             self.active_star = None
                             self.wp_index = 0
                             self.state = "APPROACH"
@@ -183,12 +191,13 @@ class Aircraft:
         }
         
         if anchor:
-            # Re-implement planar projection
-            # Center of 50x50km is (25, 25)
+            # Planar projection logic: 111.32 km per degree lat
+            # Anchor is now at (0,0) center
             KM_PER_DEG_LAT = 111.32
-            dx = self.x - 25
-            dy = 25 - self.y # Y increases downwards in sim
+            dx = self.x
+            dy = self.y
             
+            # Use same math as config_handler for consistency
             res["lat"] = round(anchor["lat"] + (dy / KM_PER_DEG_LAT), 6)
             res["lon"] = round(anchor["lon"] + (dx / (KM_PER_DEG_LAT * math.cos(math.radians(anchor["lat"])))), 6)
             

@@ -2,7 +2,6 @@ import React from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, Circle, CircleMarker, Popup, useMapEvents, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import { xyToLatLon, latLonToXY, MAP_CENTER } from '../utils/geo';
-import AdminOverlay from './AdminOverlay';
 import 'leaflet/dist/leaflet.css';
 
 // SVG icon to represent a plane pointing UP (0 degrees = North)
@@ -33,53 +32,81 @@ const GATE_COLORS = {
   "WEST": "#FBBC05"
 };
 
-const createWaypointIcon = (runwayId, color, scale = 1) => {
-  const size = 20 * scale;
+const createWaypointIcon = (label, color, scale = 1, isIAF = false) => {
+  const visualSize = (isIAF ? 42 : 36) * scale;
+  const hitAreaSize = visualSize * 4.0; // DRAMATICALLY increased hit area
+  const borderRadius = isIAF ? '2px' : '50%';
+  const transform = isIAF ? 'rotate(45deg)' : 'none';
+  const labelTransform = isIAF ? 'rotate(-45deg)' : 'none';
+
   return L.divIcon({
     className: 'custom-waypoint-icon',
     html: `
       <div style="
-        background: ${color}; 
-        color: white; 
-        border-radius: 50%; 
-        width: ${size}px; 
-        height: ${size}px; 
+        width: ${hitAreaSize}px; 
+        height: ${hitAreaSize}px; 
         display: flex; 
         justify-content: center; 
         align-items: center; 
-        font-weight: bold; 
-        font-size: ${10 * scale}px;
-        border: 2px solid white;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        cursor: pointer;
+        background: transparent;
+        pointer-events: auto; /* Explicitly catch events */
       ">
-        ${runwayId}
+        <div class="waypoint-visual-marker" style="
+          background: ${color}; 
+          color: white; 
+          border-radius: ${borderRadius}; 
+          width: ${visualSize}px; 
+          height: ${visualSize}px; 
+          display: flex; 
+          justify-content: center; 
+          align-items: center; 
+          font-weight: bold; 
+          font-size: ${Math.max(10, (isIAF ? 12 : 13) * scale)}px;
+          border: 2px solid white;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+          transform: ${transform};
+          pointer-events: none;
+        ">
+          <span style="transform: ${labelTransform}; display: block; pointer-events: none;">
+            ${label}
+          </span>
+        </div>
       </div>
     `,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2]
+    iconSize: [hitAreaSize, hitAreaSize],
+    iconAnchor: [hitAreaSize / 2, hitAreaSize / 2]
   });
 };
 
-export default function RadarMap({ 
-  flights, 
-  selectedFlight, 
-  airspace, 
-  onSelectFlight, 
+export default function RadarMap({
+  flights,
+  selectedFlight,
+  airspace,
+  onSelectFlight,
   airports = [],
   activeAirport,
   activeAirportConfig,
   onSelectAirport,
-  sendWSMessage
+  sendWSMessage,
+  draftingMode,
+  setDraftingMode,
+  airportName,
+  setAirportName,
+  runwayPoints,
+  setRunwayPoints,
+  mousePos,
+  setMousePos,
+  isRunwayBidirectional,
+  starDraft,
+  setStarDraft,
+  activeRunways = [],
+  windHeading = 0,
+  windSpeed = 0
 }) {
   const [clickedInfo, setClickedInfo] = React.useState(null);
   const [toastKey, setToastKey] = React.useState(0);
-  const [isDraftingAirport, setIsDraftingAirport] = React.useState(false);
-  const [isDraftingRunway, setIsDraftingRunway] = React.useState(false);
-  const [runwayPoints, setRunwayPoints] = React.useState([]);
-  const [mousePos, setMousePos] = React.useState(null);
   const [currentZoom, setCurrentZoom] = React.useState(13);
-  const [airportName, setAirportName] = React.useState("");
-  const [isRunwayBidirectional, setIsRunwayBidirectional] = React.useState(true);
 
   React.useEffect(() => {
     if (clickedInfo) {
@@ -94,32 +121,43 @@ export default function RadarMap({
       click(e) {
         const { lat, lng } = e.latlng;
 
-        if (isDraftingAirport) {
-           sendWSMessage('create_airport', { 
-             name: airportName || `Airport ${airports.length + 1}`, 
-             lat, 
-             lon: lng 
-           });
-           setAirportName("");
-           setIsDraftingAirport(false);
-           return;
+        if (draftingMode === 'airport') {
+          sendWSMessage('create_airport', {
+            name: airportName || `Airport ${airports.length + 1}`,
+            lat,
+            lon: lng
+          });
+          setAirportName("");
+          setDraftingMode(null);
+          return;
         }
 
-        if (isDraftingRunway) {
-           const newPoints = [...runwayPoints, [lat, lng]];
-           if (newPoints.length === 2) {
-             sendWSMessage('create_runway', { 
-               airport_name: activeAirport.name, 
-               start: newPoints[0], 
-               end: newPoints[1],
-               bidirectional: isRunwayBidirectional
-             });
-             setRunwayPoints([]);
-             setIsDraftingRunway(false);
-           } else {
-             setRunwayPoints(newPoints);
-           }
-           return;
+        if (draftingMode === 'runway') {
+          const newPoints = [...runwayPoints, [lat, lng]];
+          if (newPoints.length === 2) {
+            sendWSMessage('create_runway', {
+              airport_code: activeAirport.airport_code,
+              start: newPoints[0],
+              end: newPoints[1],
+              bidirectional: isRunwayBidirectional
+            });
+            setRunwayPoints([]);
+            setDraftingMode(null);
+          } else {
+            setRunwayPoints(newPoints);
+          }
+          return;
+        }
+
+        if (draftingMode === 'waypoint') {
+          const { x, y } = latLonToXY(lat, lng, activeAirport);
+          sendWSMessage('create_waypoint', {
+            airport_code: activeAirport.airport_code,
+            x: x,
+            y: y,
+            name: `WP_${(activeAirportConfig?.waypoints ? Object.keys(activeAirportConfig.waypoints).length : 0) + 1}`
+          });
+          return;
         }
 
         const { x, y } = latLonToXY(lat, lng, activeAirport);
@@ -127,7 +165,7 @@ export default function RadarMap({
         setToastKey(k => k + 1);
       },
       mousemove(e) {
-        if (isDraftingRunway && runwayPoints.length === 1) {
+        if (draftingMode === 'runway' && runwayPoints.length === 1) {
           setMousePos([e.latlng.lat, e.latlng.lng]);
         } else {
           if (mousePos) setMousePos(null);
@@ -148,51 +186,122 @@ export default function RadarMap({
 
   return (
     <div className="map-panel">
-      <AdminOverlay 
-        airports={airports} 
-        activeAirport={activeAirport}
-        onSelectAirport={onSelectAirport}
-        isDraftingAirport={isDraftingAirport}
-        setIsDraftingAirport={setIsDraftingAirport}
-        airportName={airportName}
-        setAirportName={setAirportName}
-        isDraftingRunway={isDraftingRunway}
-        setIsDraftingRunway={setIsDraftingRunway}
-        isRunwayBidirectional={isRunwayBidirectional}
-        setIsRunwayBidirectional={setIsRunwayBidirectional}
-        sendWSMessage={sendWSMessage}
-      />
 
-      <MapContainer center={[activeAirport.lat, activeAirport.lon]} zoom={13} style={{ height: '100%', width: '100%' }}>
+      <MapContainer center={[activeAirport.lat, activeAirport.lon]} zoom={11} style={{ height: '100%', width: '100%' }}>
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; OpenStreetMap contributors'
         />
 
-        {/* Render STAR Waypoints */}
+        {/* Airspace Boundary (50km Diameter / 25km Radius) */}
+        <Circle
+          center={[activeAirport.lat, activeAirport.lon]}
+          radius={25000}
+          pathOptions={{ color: '#007bff', weight: 2, dashArray: '10, 10', fillOpacity: 0.05 }}
+        />
+
+        {/* Cardinal Gate Markers */}
+        {Object.entries({
+          "NORTH": [0, 25],
+          "SOUTH": [0, -25],
+          "EAST": [25, 0],
+          "WEST": [-25, 0]
+        }).map(([name, xy]) => {
+          const pos = xyToLatLon(xy[0], xy[1], { lat: activeAirport.lat, lon: activeAirport.lon });
+          const color = GATE_COLORS[name] || '#888';
+          return (
+            <CircleMarker
+              key={`gate-${name}`}
+              center={pos}
+              radius={12}
+              pathOptions={{
+                color: color,
+                fillColor: color,
+                fillOpacity: 0.8,
+                weight: 3,
+                dashArray: (draftingMode === 'route' && starDraft.gate === name[0]) ? '5, 5' : null
+              }}
+            >
+              <Tooltip permanent direction="top" offset={[0, -10]}>
+                <span style={{ fontWeight: 'bold', color: color, fontSize: '0.8rem' }}>{name} ENTRY</span>
+              </Tooltip>
+            </CircleMarker>
+          );
+        })}
+
+        {/* Render Waypoint Pool */}
+        {activeAirportConfig && activeAirportConfig.waypoints && (
+          Object.values(activeAirportConfig.waypoints).map((wp) => {
+            const pos = xyToLatLon(wp.x, wp.y, activeAirport);
+            const isIAF = wp.is_iaf || wp.name?.includes("IAF");
+            const color = isIAF ? "#4B0082" : "#555"; // Neutral gray for non-assigned points
+
+            return (
+              <Marker
+                key={`wp-pool-${wp.id}`}
+                position={pos}
+                icon={createWaypointIcon(isIAF ? "IAF" : "WP", color, 0.9, isIAF)}
+                eventHandlers={{
+                  click: (e) => {
+                    if (draftingMode === 'route') {
+                      if (e.originalEvent) e.originalEvent.stopPropagation();
+                      // Add to current draft sequence
+                      setStarDraft(prev => ({
+                        ...prev,
+                        sequence: [...prev.sequence, wp.id]
+                      }));
+                    }
+                  }
+                }}
+              >
+                <Tooltip direction="top" offset={[0, -10]}>
+                  <strong>{wp.name}</strong>
+                  {draftingMode === 'route' && <div style={{ color: 'blue' }}>Click to add to route</div>}
+                </Tooltip>
+              </Marker>
+            );
+          })
+        )}
+
+        {/* Render ACTIVE (Saved) STAR Lines */}
         {activeAirportConfig && activeAirportConfig.stars && (
           Object.entries(activeAirportConfig.stars).map(([gateId, runwayMap]) => {
-            const color = GATE_COLORS[gateId.toUpperCase()] || '#888';
-            return Object.entries(runwayMap || {}).map(([runwayId, waypoints]) => {
-              return (waypoints || []).map((wp, idx) => {
-                const pos = xyToLatLon(wp.x, wp.y, activeAirportConfig.anchor);
-                return (
-                  <Marker 
-                    key={`wp-${gateId}-${runwayId}-${idx}`} 
-                    position={pos} 
-                    icon={createWaypointIcon(runwayId, color, 1)}
-                  >
-                    <Tooltip direction="top" offset={[0, -10]} opacity={0.9}>
-                      <div style={{ fontSize: '0.7rem' }}>
-                        <strong>{wp.name}</strong><br/>
-                        Gate: {gateId} | Alt: {wp.target_alt}ft
-                      </div>
-                    </Tooltip>
-                  </Marker>
-                );
-              });
+            const gateColor = GATE_COLORS[gateId.toUpperCase()] || '#888';
+            return Object.entries(runwayMap || {}).map(([runwayId, waypointIds]) => {
+              // Resolve IDs to Coords
+              const positions = (waypointIds || [])
+                .map(id => activeAirportConfig.waypoints[id])
+                .filter(Boolean)
+                .map(wp => xyToLatLon(wp.x, wp.y, activeAirport));
+
+              // Draw the Route Line
+              return positions.length > 1 ? (
+                <Polyline
+                  key={`star-line-${gateId}-${runwayId}`}
+                  positions={positions}
+                  color={gateColor}
+                  weight={2}
+                  opacity={0.4}
+                  dashArray="5, 10"
+                />
+              ) : null;
             });
           })
+        )}
+
+        {/* Render CURRENT Route Draft Line (Flare!) */}
+        {draftingMode === 'route' && starDraft.sequence.length > 0 && (
+          <Polyline
+            positions={starDraft.sequence
+              .map(id => activeAirportConfig.waypoints[id])
+              .filter(Boolean)
+              .map(wp => xyToLatLon(wp.x, wp.y, activeAirport))
+            }
+            color={GATE_COLORS[starDraft.gate.toUpperCase()] || '#007bff'}
+            weight={4}
+            opacity={0.6}
+            dashArray="10, 10"
+          />
         )}
 
         {/* Existing Airports */}
@@ -219,37 +328,49 @@ export default function RadarMap({
         })}
 
         {/* Active Airport Runways (Styled as realistic runways) */}
-        {activeAirport?.runways?.map((rw, i) => (
-          <React.Fragment key={i}>
-            {/* The tarmac */}
-            <Polyline 
-              positions={[[rw.start[0], rw.start[1]], [rw.end[0], rw.end[1]]]} 
-              color="#333" 
-              weight={runwayWidth} 
-              opacity={0.8}
-            />
-            {/* The white dashed center-line */}
-            <Polyline 
-              positions={[[rw.start[0], rw.start[1]], [rw.end[0], rw.end[1]]]} 
-              color="#fff" 
-              weight={centerLineWidth} 
-              dashArray={`${centerLineWidth * 5}, ${centerLineWidth * 5}`}
-              opacity={0.9}
-            />
-          </React.Fragment>
-        ))}
+        {activeAirport?.runways?.map((rw, i) => {
+          const is_runway_active = activeRunways.includes(rw.id);
+          return (
+            <React.Fragment key={i}>
+              {/* The tarmac */}
+              <Polyline
+                positions={[[rw.start[0], rw.start[1]], [rw.end[0], rw.end[1]]]}
+                color={is_runway_active ? "#111" : "#333"}
+                weight={runwayWidth}
+                opacity={0.8}
+              />
+              {/* Active Glow */}
+              {is_runway_active && (
+                <Polyline
+                  positions={[[rw.start[0], rw.start[1]], [rw.end[0], rw.end[1]]]}
+                  color="#28a745"
+                  weight={runwayWidth + 4}
+                  opacity={0.2}
+                />
+              )}
+              {/* The white dashed center-line */}
+              <Polyline
+                positions={[[rw.start[0], rw.start[1]], [rw.end[0], rw.end[1]]]}
+                color={is_runway_active ? "#28a745" : "#fff"}
+                weight={centerLineWidth}
+                dashArray={`${centerLineWidth * 5}, ${centerLineWidth * 5}`}
+                opacity={0.9}
+              />
+            </React.Fragment>
+          );
+        })}
 
         {/* Runway Drafting Visualization */}
         {runwayPoints.length === 1 && (
           <>
             <CircleMarker center={runwayPoints[0]} radius={5 * zoomScale} color="red" />
             {mousePos && (
-              <Polyline 
-                positions={[runwayPoints[0], mousePos]} 
-                color="#333" 
-                weight={runwayWidth * 0.7} 
-                opacity={0.5} 
-                dashArray="5, 10" 
+              <Polyline
+                positions={[runwayPoints[0], mousePos]}
+                color="#333"
+                weight={runwayWidth * 0.7}
+                opacity={0.5}
+                dashArray="5, 10"
               />
             )}
           </>
@@ -272,24 +393,24 @@ export default function RadarMap({
 
         {/* Flights */}
         {flights.map((flight) => {
-          const pos = xyToLatLon(flight.x, flight.y, activeAirport);
+          const pos = xyToLatLon(flight.x, flight.y, { lat: activeAirport.lat, lon: activeAirport.lon });
           const isSelected = selectedFlight && selectedFlight.callsign === flight.callsign;
           const planeScale = Math.max(0.8, 1 * zoomScale);
           return (
             <React.Fragment key={flight.callsign}>
               {/* Plot plane history */}
               {flight.history && (
-                <Polyline positions={flight.history.map(h => xyToLatLon(h[0], h[1], activeAirport))} color="gray" weight={2 * zoomScale} opacity={0.6} />
+                <Polyline positions={flight.history.map(h => xyToLatLon(h[0], h[1], { lat: activeAirport.lat, lon: activeAirport.lon }))} color="gray" weight={2 * zoomScale} opacity={0.6} />
               )}
-              
+
               {/* If selected, highlight with a circle marker */}
               {isSelected && (
                 <CircleMarker center={pos} radius={15 * zoomScale} color="blue" fillOpacity={0.2} pathOptions={{ dashArray: "5, 5" }} />
               )}
 
               {/* The plane itself */}
-              <Marker 
-                position={pos} 
+              <Marker
+                position={pos}
                 icon={createPlaneIcon(flight.heading, isSelected, planeScale)}
                 eventHandlers={{
                   click: () => onSelectFlight(flight)
@@ -303,11 +424,53 @@ export default function RadarMap({
 
         {clickedInfo && (
           <div key={toastKey} className="coordinate-toast">
-            <strong>Lat/Lon:</strong> {clickedInfo.lat.toFixed(6)}, {clickedInfo.lng.toFixed(6)}<br/>
+            <strong>Lat/Lon:</strong> {clickedInfo.lat.toFixed(6)}, {clickedInfo.lng.toFixed(6)}<br />
             <strong>X/Y:</strong> {clickedInfo.x.toFixed(2)}km, {clickedInfo.y.toFixed(2)}km
           </div>
         )}
       </MapContainer>
+
+      {/* Wind Indicator Overlay */}
+      <div className="wind-indicator" style={{
+        position: 'absolute',
+        top: '20px',
+        right: '20px',
+        background: 'rgba(0,0,0,0.7)',
+        color: '#fff',
+        padding: '10px 15px',
+        borderRadius: '8px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        zIndex: 1000,
+        border: '1px solid #444',
+        boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
+        pointerEvents: 'none',
+        backdropFilter: 'blur(4px)',
+        fontFamily: 'monospace'
+      }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+          <span style={{ fontSize: '0.7rem', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '1px' }}>Wind</span>
+          <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{Math.round(windHeading)}° / {Math.round(windSpeed)}kts</span>
+        </div>
+        <div style={{
+          width: '32px',
+          height: '32px',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          background: '#222',
+          borderRadius: '50%',
+          border: '2px solid #00ff00',
+          transform: `rotate(${windHeading}deg)`,
+          transition: 'transform 0.5s ease-in-out'
+        }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00ff00" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <polyline points="19 12 12 5 5 12"></polyline>
+          </svg>
+        </div>
+      </div>
     </div>
   );
 }

@@ -8,7 +8,8 @@ from atc_rl_api.api.schemas import (
     AirportConfig, RunwayConfig, Point, LatLon, 
     AirportCreateRequest, RunwayCreateRequest, 
     WaypointCreateRequest, WaypointDeleteRequest,
-    WaypointConfig
+    WaypointUpdateRequest, RunwayUpdateRequest,
+    WaypointConfig, StarRouteSaveRequest
 )
 
 AIRPORTS_DIR = Path("atc_rl_api/airports")
@@ -42,13 +43,13 @@ def create_airport(req: AirportCreateRequest) -> AirportConfig:
         airport_code=req.airport_code.upper(),
         name=req.name,
         anchor=LatLon(lat=req.anchor_lat, lon=req.anchor_lon),
-        bounds={"width_km": width, "height_km": height},
-        center=Point(x=center_x, y=center_y),
+        bounds={"width_km": 50.0, "height_km": 50.0},
+        center=Point(x=0, y=0),
         gates={
-            "N": Point(x=center_x, y=height),
-            "S": Point(x=center_x, y=0),
-            "E": Point(x=width, y=center_y),
-            "W": Point(x=0, y=center_y)
+            "N": Point(x=0, y=25.0),
+            "S": Point(x=0, y=-25.0),
+            "E": Point(x=25.0, y=0),
+            "W": Point(x=-25.0, y=0)
         },
         runways=[],
         stars={}
@@ -72,22 +73,21 @@ def geo_to_xy(lat: float, lon: float, anchor: LatLon) -> Point:
     dy = (lat - anchor.lat) * KM_PER_DEG_LAT
     dx = (lon - anchor.lon) * (KM_PER_DEG_LAT * math.cos(math.radians(anchor.lat)))
     
-    return Point(x=25 + dx, y=25 + dy)
+    return Point(x=dx, y=dy)
 
 def xy_to_latLon_list(x: float, y: float, anchor: LatLon) -> list:
     KM_PER_DEG_LAT = 111.32
-    dx = x - 25
-    dy = y - 25
+    dx = x
+    dy = y
     lat = anchor.lat + (dy / KM_PER_DEG_LAT)
     lon = anchor.lon + (dx / (KM_PER_DEG_LAT * math.cos(math.radians(anchor.lat))))
     return [round(lat, 6), round(lon, 6)]
 
-def add_runway_from_geo(airport_name: str, start_latlon: list, end_latlon: list, bidirectional: bool = False) -> AirportConfig:
-    # Find airport by name
-    all_ap = list_all_airports()
-    config = next((a for a in all_ap if a.name == airport_name), None)
+def add_runway_from_geo(airport_code: str, start_latlon: list, end_latlon: list, bidirectional: bool = False) -> AirportConfig:
+    # Find airport by code
+    config = load_airport_config(airport_code)
     if not config:
-        raise ValueError(f"Airport with name '{airport_name}' not found")
+        raise ValueError(f"Airport with code '{airport_code}' not found")
         
     p1 = geo_to_xy(start_latlon[0], start_latlon[1], config.anchor)
     p2 = geo_to_xy(end_latlon[0], end_latlon[1], config.anchor)
@@ -110,29 +110,58 @@ def add_runway_from_geo(airport_name: str, start_latlon: list, end_latlon: list,
         return Point(x=start.x - norm_dx * iaf_dist, y=start.y - norm_dy * iaf_dist)
 
     rw_id = f"RWY_{len(config.runways) + 1}"
+    iaf_point = generate_iaf(p1, dx, dy)
+    
+    iaf_id = f"IAF-{rw_id}"
+    iaf_wp = WaypointConfig(
+        id=iaf_id,
+        name=iaf_id,
+        x=iaf_point.x,
+        y=iaf_point.y,
+        target_alt=3000,
+        target_speed=210,
+        is_iaf=True
+    )
+    
     new_runway = RunwayConfig(
         id=rw_id,
         heading=heading,
         length_km=length,
         start=p1,
         end=p2,
-        iaf=generate_iaf(p1, dx, dy)
+        iaf=iaf_point
     )
     
     config.runways.append(new_runway)
+    # Add IAF to pool, but NOT to routes (per user instructions)
+    config.waypoints[iaf_id] = iaf_wp
     
     if bidirectional:
         # Create reverse runway (180 deg opposite)
         rev_id = f"{rw_id}_REV"
         rev_heading = (heading + 180) % 360
+        rev_iaf_point = generate_iaf(p2, -dx, -dy)
+        rev_iaf_id = f"IAF-{rev_id}"
+        rev_iaf_wp = WaypointConfig(
+            id=rev_iaf_id,
+            name=rev_iaf_id,
+            x=rev_iaf_point.x,
+            y=rev_iaf_point.y,
+            target_alt=3000,
+            target_speed=210,
+            is_iaf=True
+        )
+        
         config.runways.append(RunwayConfig(
             id=rev_id,
             heading=rev_heading,
             length_km=length,
             start=p2,
             end=p1,
-            iaf=generate_iaf(p2, -dx, -dy)
+            iaf=rev_iaf_point
         ))
+        # Add reverse IAF to pool
+        config.waypoints[rev_iaf_id] = rev_iaf_wp
         
     save_airport_config(config)
     return config
@@ -179,48 +208,96 @@ def add_waypoint(req: WaypointCreateRequest) -> AirportConfig:
     config = load_airport_config(req.airport_code)
     if not config:
         raise ValueError(f"Airport {req.airport_code} not found")
-    
-    # Initialize star structure if missing
-    if req.gate_id not in config.stars:
-        config.stars[req.gate_id] = {}
-    if req.target_runway not in config.stars[req.gate_id]:
-        config.stars[req.gate_id][req.target_runway] = []
         
-    wp = WaypointConfig(x=req.x, y=req.y)
+    wp = WaypointConfig(
+        name=req.name or f"WP_{len(config.waypoints) + 1}",
+        x=req.x,
+        y=req.y,
+        target_alt=req.target_alt or 3000,
+        target_speed=req.target_speed or 210,
+        is_iaf=req.is_iaf
+    )
     
-    route = config.stars[req.gate_id][req.target_runway]
-    if req.sequence_index == -1 or req.sequence_index >= len(route):
-        route.append(wp)
-    else:
-        route.insert(req.sequence_index, wp)
-        
+    config.waypoints[wp.id] = wp
     save_airport_config(config)
     return config
 
-def delete_waypoint(req: WaypointDeleteRequest) -> AirportConfig:
+def save_star_route(req: StarRouteSaveRequest) -> AirportConfig:
     config = load_airport_config(req.airport_code)
     if not config:
         raise ValueError(f"Airport {req.airport_code} not found")
         
-    if (req.gate_id in config.stars and 
-        req.target_runway in config.stars[req.gate_id] and
-        0 <= req.sequence_index < len(config.stars[req.gate_id][req.target_runway])):
+    if req.gate_id not in config.stars:
+        config.stars[req.gate_id] = {}
         
-        config.stars[req.gate_id][req.target_runway].pop(req.sequence_index)
-        save_airport_config(config)
-        
+    config.stars[req.gate_id][req.runway_id] = req.route_sequence
+    save_airport_config(config)
     return config
-def delete_runway(airport_name: str, runway_id: str) -> Optional[AirportConfig]:
-    all_ap = list_all_airports()
-    config = next((a for a in all_ap if a.name == airport_name), None)
+
+def update_waypoint(req: WaypointUpdateRequest) -> AirportConfig:
+    config = load_airport_config(req.airport_code)
+    if not config:
+        raise ValueError(f"Airport {req.airport_code} not found")
+        
+    # In pool architecture, we look it up from the global pool either by sequence in a route or ID
+    # But usually, it's better to update by ID directly. 
+    # For now, let's look for any waypoint in the pool that might match (or we should update by ID)
+    # Refactoring WaypointUpdateRequest to include ID would be better.
+    # Let's assume for now we look in config.waypoints
+    
+    for wp in config.waypoints.values():
+        if wp.id == req.gate_id: # Reusing existing field temporarily or assuming gate_id was used as ID
+            if req.name is not None: wp.name = req.name
+            if req.target_alt is not None: wp.target_alt = req.target_alt
+            if req.target_speed is not None: wp.target_speed = req.target_speed
+            break
+            
+    save_airport_config(config)
+    return config
+
+def update_runway(req: RunwayUpdateRequest) -> AirportConfig:
+    config = load_airport_config(req.airport_code)
+    if not config:
+        raise ValueError(f"Airport {req.airport_code} not found")
+        
+    for rw in config.runways:
+        if rw.id == req.runway_id:
+            if req.new_id: rw.id = req.new_id
+            if req.heading is not None: rw.heading = req.heading
+            break
+            
+    save_airport_config(config)
+    return config
+
+def delete_waypoint(airport_code: str, waypoint_id: str) -> Optional[AirportConfig]:
+    config = load_airport_config(airport_code)
+    if not config:
+        return None
+        
+    # Remove from global pool
+    if waypoint_id in config.waypoints:
+        del config.waypoints[waypoint_id]
+        
+    # Cascade: remove ID from all star procedures
+    for gate in config.stars:
+        for rwy in config.stars[gate]:
+            config.stars[gate][rwy] = [wp_id for wp_id in config.stars[gate][rwy] if wp_id != waypoint_id]
+            
+    save_airport_config(config)
+    return config
+def delete_runway(airport_code: str, runway_id: str) -> Optional[AirportConfig]:
+    config = load_airport_config(airport_code)
     if not config:
         return None
         
     # Remove the runway and its reverse if applicable
-    original_count = len(config.runways)
     config.runways = [rw for rw in config.runways if rw.id != runway_id and rw.id != f"{runway_id}_REV"]
     
-    if len(config.runways) < original_count:
-        save_airport_config(config)
-        return config
-    return None
+    # Cascade delete from stars (terminal procedures)
+    for gate in config.stars:
+        # pop() with None default avoids KeyError if the runway wasn't defined for a specific gate
+        config.stars[gate].pop(runway_id, None)
+        config.stars[gate].pop(f"{runway_id}_REV", None)
+    
+    save_airport_config(config)
+    return config

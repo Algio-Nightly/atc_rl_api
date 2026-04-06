@@ -12,7 +12,7 @@ const KM_PER_DEGREE_LAT = 111.32;
  * Converts metric x, y (kilometers from center) to geographic [lat, lon].
  * @param {number} x - Easting in kilometers.
  * @param {number} y - Northing in kilometers.
- * @param {{lat: number, lon: number}} center - The [0,0] reference.
+ * @param {{lat: number, lon: number}} center - The [0,0] reference (Airport Anchor).
  * @returns {[number, number]} - [latitude, longitude].
  */
 export function xyToLatLon(x, y, center = DEFAULT_CENTER) {
@@ -25,7 +25,7 @@ export function xyToLatLon(x, y, center = DEFAULT_CENTER) {
  * Converts geographic latitude, longitude to metric x, y (kilometers from center).
  * @param {number} lat - Latitude.
  * @param {number} lon - Longitude.
- * @param {{lat: number, lon: number}} center - The [0,0] reference.
+ * @param {{lat: number, lon: number}} center - The [0,0] reference (Airport Anchor).
  * @returns {{x: number, y: number}} - {x, y} offsets in kilometers.
  */
 export function latLonToXY(lat, lon, center = DEFAULT_CENTER) {

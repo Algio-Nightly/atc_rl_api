@@ -3,6 +3,7 @@
 from pydantic import BaseModel, field_validator, Field
 from typing import List, Optional, Literal, Union, Dict
 from enum import Enum
+import uuid
 
 class CommandType(str, Enum):
     ATC = "ATC"
@@ -60,6 +61,8 @@ class CommandRequest(BaseModel):
     new_altitude: Optional[float] = None
     new_speed: Optional[float] = None
     time_scale: Optional[float] = None
+    wind_heading: Optional[float] = None
+    wind_speed: Optional[float] = None
 
     @field_validator("command_id")
     @classmethod
@@ -113,11 +116,14 @@ class RunwayConfig(BaseModel):
     iaf: Point
 
 class WaypointConfig(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = "WP"
     x: float
     y: float
     target_alt: int = 3000
     target_speed: int = 210
+    is_iaf: bool = False
+    holding_stack: List[str] = [] # List of aircraft callsigns currently holding here
 
 class AirportConfig(BaseModel):
     airport_code: str
@@ -127,8 +133,10 @@ class AirportConfig(BaseModel):
     center: Point = Point(x=25, y=25)
     gates: Dict[str, Point]
     runways: List[RunwayConfig] = []
-    waypoint_configs: List[WaypointConfig] = [] # Pool of all waypoints
-    stars: Dict[str, Dict[str, List[WaypointConfig]]] = {} # gate -> runway -> waypoints
+    # Global pool of waypoints: ID -> Config
+    waypoints: Dict[str, WaypointConfig] = {}
+    # gate -> runway -> waypoint_ids
+    stars: Dict[str, Dict[str, List[str]]] = {}
 
 # --- Request Models ---
 
@@ -138,19 +146,29 @@ class AirportCreateRequest(BaseModel):
     anchor_lat: float
     anchor_lon: float
 
-class RunwayCreateRequest(BaseModel):
-    airport_code: str
-    runway_id: str
-    length_km: float
-    heading: float
-
 class WaypointCreateRequest(BaseModel):
+    airport_code: str
+    x: float
+    y: float
+    name: Optional[str] = None
+    target_alt: Optional[int] = 3000
+    target_speed: Optional[int] = 210
+    is_iaf: bool = False
+
+class StarRouteSaveRequest(BaseModel):
+    airport_code: str
+    gate_id: str
+    runway_id: str
+    route_sequence: List[str] # List of waypoint IDs
+
+class WaypointUpdateRequest(BaseModel):
     airport_code: str
     gate_id: str
     target_runway: str
-    x: float
-    y: float
-    sequence_index: int = -1 # -1 to append
+    sequence_index: int
+    name: Optional[str] = None
+    target_alt: Optional[int] = None
+    target_speed: Optional[int] = None
 
 class WaypointDeleteRequest(BaseModel):
     airport_code: str
@@ -158,12 +176,26 @@ class WaypointDeleteRequest(BaseModel):
     target_runway: str
     sequence_index: int
 
+class RunwayUpdateRequest(BaseModel):
+    airport_code: str
+    runway_id: str # Original ID for lookup
+    new_id: Optional[str] = None
+    heading: Optional[float] = None
+
+class RunwayCreateRequest(BaseModel):
+    airport_code: str
+    runway_id: str
+    length_km: float
+    heading: float
+
 class SimSetAirportRequest(BaseModel):
     airport_code: str
 
 # --- Simulation State (End of file to avoid forward refs) ---
 
 class RunwaySummary(BaseModel):
+    id: str
+    heading: float
     start: List[float]
     end: List[float]
 
@@ -171,12 +203,13 @@ class AirportSummary(BaseModel):
     name: str
     lat: float
     lon: float
+    airport_code: str
     runways: List[RunwaySummary]
 
 class FullSimulationState(BaseModel):
     simulation_time: float
     is_terminal: bool
-    active_runway: Optional[str]
+    active_runways: List[str]
     wind_heading: float
     wind_speed: float
     time_scale: float

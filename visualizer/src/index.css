@@ -196,3 +196,15 @@ body {
     transform: translateY(10px);
   }
 }
+
+/* Waypoint Hover Animations */
+.waypoint-visual-marker {
+  transition: all 0.2s ease-in-out;
+}
+
+.custom-waypoint-icon:hover .waypoint-visual-marker {
+  transform: scale(1.3) !important;
+  filter: brightness(1.1);
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.9) !important;
+  z-index: 1000;
+}

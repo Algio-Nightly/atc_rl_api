@@ -1,7 +1,7 @@
 import React from 'react';
 import { MAP_CENTER } from '../utils/geo';
 
-export default function FlightRoster({ flights, onSelectFlight, gameState }) {
+export default function FlightRoster({ flights, onSelectFlight, gameState, sendWSMessage }) {
   return (
     <div className="sidebar-panel">
       {gameState && (
@@ -10,7 +10,7 @@ export default function FlightRoster({ flights, onSelectFlight, gameState }) {
           <div style={{ fontSize: '0.85rem', marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px', color: '#1a1a1a' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Sim Time:</span> <span style={{ fontWeight: '600' }}>{gameState.simulation_time?.toFixed(1)}s</span></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Wind:</span> <span style={{ fontWeight: '600' }}>{gameState.wind_heading}° @ {gameState.wind_speed}kts</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Active RWY:</span> <span style={{ color: '#28a745', fontWeight: 'bold' }}>{gameState.active_runway || 'NONE'}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Active RWY:</span> <span style={{ color: '#28a745', fontWeight: 'bold' }}>{(gameState.active_runways && gameState.active_runways.length > 0) ? gameState.active_runways.join(', ') : 'NONE'}</span></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Time Scale:</span> <span style={{ color: '#007bff', fontWeight: 'bold' }}>{gameState.time_scale}x</span></div>
           </div>
         </div>
@@ -54,10 +54,8 @@ export default function FlightRoster({ flights, onSelectFlight, gameState }) {
                 onMouseOut={(e) => e.target.style.opacity = 0.7}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (window.confirm(`Delete aircraft ${flight.callsign}?`)) {
-                    if (sendWSMessage) {
-                       sendWSMessage('delete_aircraft', { callsign: flight.callsign });
-                    }
+                  if (sendWSMessage) {
+                     sendWSMessage('delete_aircraft', { callsign: flight.callsign });
                   }
                 }}
               >×</button>
