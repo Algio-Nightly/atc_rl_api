@@ -331,6 +331,14 @@ async def websocket_endpoint(websocket: WebSocket):
                                 elif cmd_id == "ATC_VECTOR" and value: req_data["new_heading"] = float(value)
                                 elif cmd_id == "ATC_SPEED" and value: req_data["new_speed"] = float(value)
                                 elif cmd_id == "ATC_DIRECT_TO" and value: req_data["waypoint_name"] = value.upper()
+                                elif cmd_id == "ATC_HOLD":
+                                    if len(parts) >= 5:
+                                        # ATC HOLD UA123 POM 5000
+                                        req_data["waypoint_name"] = parts[3].upper()
+                                        req_data["new_altitude"] = float(parts[4])
+                                    elif value:
+                                        # Fallback for old/simple HOLD waypoint
+                                        req_data["waypoint_name"] = value.upper()
                                 
                                 result = await process_command(CommandRequest(**req_data))
                                 if "error" in result:
@@ -388,6 +396,14 @@ async def websocket_endpoint(websocket: WebSocket):
                     engine.reset_environment()
                     print("[Sim Engine] Simulation reset via WebSocket")
 
+                elif msg_type == "set_time_scale":
+                    new_scale = float(payload.get("scale", 1.0))
+                    engine.time_scale = new_scale
+                    if engine.config:
+                        engine.config.time_scale = new_scale
+                        config_handler.save_airport_config(engine.config)
+                    print(f"[Sim Engine] Time scale updated to {new_scale}x and persisted.")
+
             except Exception as e:
                 print(f"[WS Handler Error] type={msg_type}, error={e}")
 
@@ -403,7 +419,10 @@ async def process_command(request: CommandRequest):
     if request.type == CommandType.SIMULATION:
         if request.command_id == "CMD_SET_TIME_SCALE" and request.time_scale is not None:
             engine.time_scale = request.time_scale
-            engine.event_buffer.append({"type": "INFO", "msg": f"CMD: Time scale set to {request.time_scale}x", "timestamp": time.time()})
+            if engine.config:
+                engine.config.time_scale = request.time_scale
+                config_handler.save_airport_config(engine.config)
+            engine.event_buffer.append({"type": "INFO", "msg": f"CMD: Time scale set to {request.time_scale}x (Persisted)", "timestamp": time.time()})
             return {"status": "Time scale updated"}
         elif request.command_id == "CMD_SET_WIND" and request.wind_heading is not None:
             engine.update_weather(request.wind_heading, request.wind_speed or engine.wind_speed)
@@ -427,9 +446,32 @@ async def process_command(request: CommandRequest):
         aircraft.target_speed = request.new_speed
         engine.event_buffer.append({"type": "ATC", "msg": f"SPEED: {request.callsign} -> {request.new_speed}kts", "timestamp": time.time()})
     elif cmd == "ATC_HOLD":
-        aircraft.state = "HOLDING"
-        if not aircraft.holding_fix: aircraft.holding_fix = {"x": aircraft.x, "y": aircraft.y}
-        engine.event_buffer.append({"type": "ATC", "msg": f"HOLD: {request.callsign} instructed to hold current position", "timestamp": time.time()})
+        if request.waypoint_name and engine.config:
+            # 1. Flexible search for the holding waypoint
+            search_term = request.waypoint_name.upper()
+            found_wp = None
+            for wp in engine.config.waypoints.values():
+                if (wp.name and wp.name.upper() == search_term) or wp.id.upper() == search_term:
+                    found_wp = wp.model_dump()
+                    break
+            
+            if found_wp:
+                aircraft.holding_fix = {"x": found_wp["x"], "y": found_wp["y"]}
+                if request.new_altitude is not None:
+                    aircraft.target_alt = request.new_altitude
+                aircraft.state = "HOLDING"
+                
+                msg = f"HOLD: {request.callsign} holding at {found_wp['name']}"
+                if request.new_altitude is not None:
+                    msg += f" @ {int(request.new_altitude)}ft"
+                engine.event_buffer.append({"type": "ATC", "msg": msg, "timestamp": time.time()})
+            else:
+                return {"error": f"Holding waypoint '{request.waypoint_name}' not found", "code": 404}
+        else:
+            # Fallback for simple HOLD commands
+            aircraft.state = "HOLDING"
+            if not aircraft.holding_fix: aircraft.holding_fix = {"x": aircraft.x, "y": aircraft.y}
+            engine.event_buffer.append({"type": "ATC", "msg": f"HOLD: {request.callsign} holding current position", "timestamp": time.time()})
     elif cmd == "ATC_RESUME":
         aircraft.state = "ENROUTE"
         aircraft.direct_to_wp = None

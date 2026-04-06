@@ -137,6 +137,7 @@ class AirportConfig(BaseModel):
     waypoints: Dict[str, WaypointConfig] = {}
     # gate -> runway -> waypoint_ids
     stars: Dict[str, Dict[str, List[str]]] = {}
+    time_scale: float = 1.0
 
 # --- Request Models ---
 

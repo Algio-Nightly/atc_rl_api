@@ -26,6 +26,7 @@ class SimulationEngine:
         """Load a new airport configuration and reset the simulation"""
         self.reset_environment()
         self.config = config
+        self.time_scale = config.time_scale if hasattr(config, 'time_scale') else 1.0
         
         # Determine initial active runways based on default wind
         self.update_weather(self.wind_heading, self.wind_speed)
@@ -40,6 +41,9 @@ class SimulationEngine:
     def update_config(self, config):
         """Update the configuration without resetting the simulation state"""
         self.config = config
+        if hasattr(config, 'time_scale'):
+            self.time_scale = config.time_scale
+            
         # Re-evaluate weather logic to ensure active runways are still valid
         self.update_weather(self.wind_heading, self.wind_speed)
         

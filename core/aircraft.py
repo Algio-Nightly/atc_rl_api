@@ -58,21 +58,26 @@ class Aircraft:
             stars = engine_context.get("stars", {})
 
             if self.state == "HOLDING" and self.holding_fix:
-                # 0a. Holding Pattern (Orbital)
+                # 0a. Holding Pattern (Two-Phase: Transit then Orbit)
                 fx, fy = self.holding_fix["x"], self.holding_fix["y"]
                 dx = fx - self.x
                 dy = fy - self.y
                 dist_to_fix = math.sqrt(dx**2 + dy**2)
                 angle_to_fix = math.degrees(math.atan2(dy, dx))
                 
-                # Orbit logic: Steer 90 deg from fix, with correction to maintain radius
-                # Clockwise orbit
-                offset = 90
-                correction = (dist_to_fix - self.holding_radius) * 20 # Sharp correction
-                correction = max(-70, min(70, correction))
-                
-                target_math = (angle_to_fix + offset + correction)
-                self.target_heading = (90 - target_math) % 360
+                # If further than radius + buffer, fly directly to the fix
+                if dist_to_fix > (self.holding_radius + 0.5):
+                    # Phase 1: Transit (Direct flight to waypoint)
+                    self.target_heading = (90 - angle_to_fix) % 360
+                else:
+                    # Phase 2: Orbit (Circular circling)
+                    # Orbit logic: Steer 90 deg from fix, with correction to maintain radius
+                    offset = 90 # Clockwise
+                    correction = (dist_to_fix - self.holding_radius) * 20 # Sharp radial correction
+                    correction = max(-70, min(70, correction))
+                    
+                    target_math = (angle_to_fix + offset + correction)
+                    self.target_heading = (90 - target_math) % 360
 
             elif self.direct_to_wp:
                 # 0b. Direct-To Logic

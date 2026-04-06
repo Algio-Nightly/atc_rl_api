@@ -153,6 +153,38 @@ export default function AdminOverlay({
         <button onClick={() => setIsExpanded(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: '1.2rem' }}>&times;</button>
       </div>
 
+      {/* Simulation Speed Section */}
+      <div className="section" style={{ marginBottom: '16px' }}>
+        <h4>Simulation Speed</h4>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+          <input 
+            type="range" 
+            min="1" 
+            max="8" 
+            step="1"
+            value={activeAirportConfig?.time_scale || 1}
+            onChange={(e) => sendWSMessage('set_time_scale', { scale: e.target.value })}
+            style={{ 
+              flex: 1,
+              cursor: 'pointer',
+              accentColor: '#007bff'
+            }}
+          />
+          <span style={{ 
+            minWidth: '40px', 
+            textAlign: 'right', 
+            fontWeight: 'bold', 
+            color: '#007bff',
+            background: '#e7f3ff',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            fontSize: '0.8rem'
+          }}>
+            {activeAirportConfig?.time_scale || 1}x
+          </span>
+        </div>
+      </div>
+
       {/* Airports Section */}
       <div className="section">
         <h4>Airports</h4>
@@ -330,6 +362,16 @@ export default function AdminOverlay({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <input placeholder="Callsign" value={spawnFields.callsign} onChange={e => setSpawnFields({ ...spawnFields, callsign: e.target.value })} style={{ width: '100%', fontSize: '0.75rem' }} />
           <div style={{ display: 'flex', gap: '4px' }}>
+            <select 
+              value={spawnFields.gate} 
+              onChange={e => setSpawnFields({ ...spawnFields, gate: e.target.value })} 
+              style={{ flex: 1, fontSize: '0.75rem', padding: '2px' }}
+            >
+              {activeAirportConfig?.gates ? 
+                Object.keys(activeAirportConfig.gates).map(g => <option key={g} value={g}>{g}</option>) :
+                <><option value="N">N</option><option value="S">S</option><option value="E">E</option><option value="W">W</option></>
+              }
+            </select>
             <input type="number" placeholder="Alt" value={spawnFields.altitude} onChange={e => setSpawnFields({ ...spawnFields, altitude: e.target.value })} style={{ flex: 1, fontSize: '0.75rem' }} />
             <input type="number" placeholder="Spd" value={spawnFields.speed} onChange={e => setSpawnFields({ ...spawnFields, speed: e.target.value })} style={{ flex: 1, fontSize: '0.75rem' }} />
           </div>

@@ -190,5 +190,6 @@
         "IAF-RWY_1_REV"
       ]
     }
-  }
+  },
+  "time_scale": 8.0
 }
