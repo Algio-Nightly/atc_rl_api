@@ -8,6 +8,15 @@ class CommandType(str, Enum):
     ATC = "ATC"
     SIMULATION = "CMD"
 
+class ATCCommandID(str, Enum):
+    ATC_VECTOR = "ATC_VECTOR"
+    ATC_ALTITUDE = "ATC_ALTITUDE"
+    ATC_SPEED = "ATC_SPEED"
+    ATC_DIRECT_TO = "ATC_DIRECT_TO"
+    ATC_HOLD = "ATC_HOLD"
+    ATC_APPROACH = "ATC_APPROACH"
+    ATC_LAND = "ATC_LAND"
+
 class PilotMessageType(str, Enum):
     REQUEST = "REQUEST"
     REPORT = "REPORT"
@@ -41,20 +50,12 @@ class AircraftState(BaseModel):
     wp_index: int = 0
     is_holding: bool = False
 
-class FullSimulationState(BaseModel):
-    simulation_time: float
-    is_terminal: bool
-    active_runway: str
-    wind_heading: float
-    wind_speed: float
-    time_scale: float
-    aircrafts: Dict[str, AircraftState]
-    events: List[dict]
 
 class CommandRequest(BaseModel):
     type: CommandType
-    command_id: str
+    command_id: Union[ATCCommandID, str]
     callsign: Optional[str] = None # Optional for global CMDs like TIME_SCALE
+    waypoint_name: Optional[str] = None
     new_heading: Optional[float] = None
     new_altitude: Optional[float] = None
     new_speed: Optional[float] = None
@@ -90,4 +91,96 @@ class SpawnRequest(BaseModel):
     gate: str
     altitude: int = 10000
     heading: float = 0
+    heading: float = 0
     speed: int = 250
+
+# --- Configuration Schemas ---
+
+class Point(BaseModel):
+    x: float
+    y: float
+
+class LatLon(BaseModel):
+    lat: float
+    lon: float
+
+class RunwayConfig(BaseModel):
+    id: str
+    heading: float
+    length_km: float
+    start: Point
+    end: Point
+    iaf: Point
+
+class WaypointConfig(BaseModel):
+    name: str = "WP"
+    x: float
+    y: float
+    target_alt: int = 3000
+    target_speed: int = 210
+
+class AirportConfig(BaseModel):
+    airport_code: str
+    name: str
+    anchor: LatLon
+    bounds: Dict[str, float] = {"width_km": 50, "height_km": 50}
+    center: Point = Point(x=25, y=25)
+    gates: Dict[str, Point]
+    runways: List[RunwayConfig] = []
+    waypoint_configs: List[WaypointConfig] = [] # Pool of all waypoints
+    stars: Dict[str, Dict[str, List[WaypointConfig]]] = {} # gate -> runway -> waypoints
+
+# --- Request Models ---
+
+class AirportCreateRequest(BaseModel):
+    airport_code: str
+    name: str
+    anchor_lat: float
+    anchor_lon: float
+
+class RunwayCreateRequest(BaseModel):
+    airport_code: str
+    runway_id: str
+    length_km: float
+    heading: float
+
+class WaypointCreateRequest(BaseModel):
+    airport_code: str
+    gate_id: str
+    target_runway: str
+    x: float
+    y: float
+    sequence_index: int = -1 # -1 to append
+
+class WaypointDeleteRequest(BaseModel):
+    airport_code: str
+    gate_id: str
+    target_runway: str
+    sequence_index: int
+
+class SimSetAirportRequest(BaseModel):
+    airport_code: str
+
+# --- Simulation State (End of file to avoid forward refs) ---
+
+class RunwaySummary(BaseModel):
+    start: List[float]
+    end: List[float]
+
+class AirportSummary(BaseModel):
+    name: str
+    lat: float
+    lon: float
+    runways: List[RunwaySummary]
+
+class FullSimulationState(BaseModel):
+    simulation_time: float
+    is_terminal: bool
+    active_runway: Optional[str]
+    wind_heading: float
+    wind_speed: float
+    time_scale: float
+    aircrafts: Dict[str, AircraftState]
+    events: List[dict]
+    config: Optional[AirportConfig] = None
+    airports: List[AirportSummary] = []

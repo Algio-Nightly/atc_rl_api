@@ -1,0 +1,74 @@
+{
+  "airport_code": "VOCB",
+  "name": "Coimbatore",
+  "anchor": {
+    "lat": 11.030288,
+    "lon": 77.039218
+  },
+  "bounds": {
+    "width_km": 50.0,
+    "height_km": 50.0
+  },
+  "center": {
+    "x": 25.0,
+    "y": 25.0
+  },
+  "gates": {
+    "N": {
+      "x": 25.0,
+      "y": 50.0
+    },
+    "S": {
+      "x": 25.0,
+      "y": 0.0
+    },
+    "E": {
+      "x": 50.0,
+      "y": 25.0
+    },
+    "W": {
+      "x": 0.0,
+      "y": 25.0
+    }
+  },
+  "runways": [
+    {
+      "id": "05",
+      "heading": 48.0,
+      "length_km": 3.0,
+      "start": {
+        "x": 23.88,
+        "y": 24.0
+      },
+      "end": {
+        "x": 26.12,
+        "y": 26.0
+      },
+      "iaf": {
+        "x": 17.2,
+        "y": 18.0
+      }
+    }
+  ],
+  "waypoint_configs": [],
+  "stars": {
+    "N": {
+      "05": [
+        {
+          "name": "N1",
+          "x": 10.0,
+          "y": 40.0,
+          "target_alt": 10000,
+          "target_speed": 250
+        },
+        {
+          "name": "N2",
+          "x": 15.0,
+          "y": 25.0,
+          "target_alt": 5000,
+          "target_speed": 210
+        }
+      ]
+    }
+  }
+}

@@ -17,7 +17,7 @@ export default function DevConsole({ actions, onSendCommand }) {
   return (
     <div className="console-panel">
       <h3>Dev Console</h3>
-      
+
       <div style={{ marginTop: '16px', background: '#222', color: '#0f0', padding: '8px', fontFamily: 'monospace', height: '100px', overflowY: 'auto' }}>
         {actions.map((act, i) => (
           <div key={i}>
@@ -25,14 +25,14 @@ export default function DevConsole({ actions, onSendCommand }) {
           </div>
         ))}
       </div>
-      
+
       <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
-        <input 
-          type="text" 
-          value={cmd} 
+        <input
+          type="text"
+          value={cmd}
           onChange={e => setCmd(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') handleSend(); }} 
-          placeholder="Type slash commands (e.g. /spawn-storm) or raw JSON..." 
+          onKeyDown={e => { if (e.key === 'Enter') handleSend(); }}
+          placeholder="Type slash commands (e.g. /spawn-storm) or raw JSON..."
           style={{ flex: 1, padding: '4px' }}
         />
         <button className="btn" onClick={handleSend}>Send</button>

@@ -1,16 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { mockData } from './mockData';
 import { DEFAULT_CENTER } from './utils/geo';
 import RadarMap from './components/RadarMap';
 import FlightRoster from './components/FlightRoster';
 import DevConsole from './components/DevConsole';
 import FlightModal from './components/FlightModal';
-import './App.css'; // Just in case, though we put styles in index.css
+import './App.css';
+
+const INITIAL_STATE = {
+  simulation_time: 0,
+  is_terminal: false,
+  active_runway: null,
+  wind_heading: 0,
+  wind_speed: 0,
+  time_scale: 1,
+  aircrafts: {},
+  events: [],
+  airspace: { nodes: [], edges: [] },
+  airports: [],
+  config: null
+};
 
 function App() {
-  const [data, setData] = useState(mockData);
+  const [data, setData] = useState(INITIAL_STATE);
   const [selectedFlight, setSelectedFlight] = useState(null);
-  const [activeAirport, setActiveAirport] = useState(mockData.airports[0] || { ...DEFAULT_CENTER, name: "Default" });
+  const [activeAirport, setActiveAirport] = useState({ ...DEFAULT_CENTER, name: "Loading..." });
   const wsRef = useRef(null);
 
   const sendWSMessage = (type, payload) => {
@@ -31,7 +44,6 @@ function App() {
               rwys.push({ start: payload.end, end: payload.start });
             }
             const updated = { ...ap, runways: [...(ap.runways || []), ...rwys] };
-            // Ensure local selection is updated too
             if (activeAirport?.name === ap.name) {
               setActiveAirport(updated);
             }
@@ -50,90 +62,104 @@ function App() {
   };
 
   useEffect(() => {
-    // Determine WS URL (fallback to localhost:8080)
-    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/ws';
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      console.log('Connected to RL Backend WebSocket');
+    // 1. Bootstrap: Fetch current state from REST API
+    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    const fetchState = () => {
+      fetch(`${apiBase}/state`)
+        .then(res => res.json())
+        .then(initialData => {
+          setData(initialData);
+          if (initialData.airports && initialData.config) {
+            const current = initialData.airports.find(a => a.name === initialData.config.name);
+            if (current) setActiveAirport(current);
+          }
+        })
+        .catch(err => console.error("Initial fetch failed:", err));
     };
+    fetchState();
 
-    ws.onmessage = (event) => {
-      try {
-        const incomingData = JSON.parse(event.data);
-        if (incomingData && typeof incomingData === 'object') {
-           setData(prevData => {
-             const newData = { ...prevData, ...incomingData };
-             // Keep active airport object in sync if its data changed in the backend
-             setActiveAirport(prevActive => {
-               if (!prevActive || !newData.airports) return prevActive;
-               const updated = newData.airports.find(a => a.name === prevActive.name);
-               return updated || prevActive;
-             });
-             return newData;
-           });
+    // 2. Real-time: Connect to WebSocket with Auto-Reconnect
+    const connectWS = () => {
+      const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws';
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => console.log('✅ Connected to RL Backend');
+
+      ws.onmessage = (event) => {
+        try {
+          const incomingData = JSON.parse(event.data);
+          if (incomingData && typeof incomingData === 'object') {
+            setData(prevData => {
+              const newData = { ...prevData, ...incomingData };
+              if (newData.airports) {
+                setActiveAirport(prevActive => {
+                  if (!prevActive || prevActive.name === "Loading...") {
+                    return newData.airports[0] || prevActive;
+                  }
+                  return newData.airports.find(a => a.name === prevActive.name) || prevActive;
+                });
+              }
+              return newData;
+            });
+          }
+        } catch (err) {
+          console.error("❌ WS Message Error:", err);
         }
-      } catch (err) {
-        console.error("Error parsing WS message:", err);
-      }
+      };
+
+      ws.onerror = (error) => console.error('⚠️ WebSocket Error:', error);
+
+      ws.onclose = (e) => {
+        console.log(`🔌 Disconnected (Code: ${e.code}). Retrying in 2s...`);
+        setTimeout(connectWS, 2000);
+      };
     };
 
-    ws.onerror = (error) => {
-      console.error('WebSocket Error:', error);
-    };
-
-    ws.onclose = () => {
-      console.log('Disconnected from RL Backend');
-    };
-
+    connectWS();
     return () => {
-      ws.close();
+      if (wsRef.current) wsRef.current.close();
     };
   }, []);
 
-  const handleFlightSelect = (flight) => {
-    setSelectedFlight(flight);
-  };
+  const handleFlightSelect = (flight) => setSelectedFlight(flight);
 
   const handleSendCommand = (cmd) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'command', payload: cmd }));
-    } else {
-      console.warn("Cannot send command, WebSocket is not open.");
     }
   };
 
-  const handleCloseModal = () => {
-    setSelectedFlight(null);
-  };
+  const handleCloseModal = () => setSelectedFlight(null);
 
   const flightsList = data.aircrafts ? Object.values(data.aircrafts) : [];
 
   return (
     <div className="dashboard-container">
-      <RadarMap 
-        flights={flightsList} 
+      <RadarMap
+        flights={flightsList}
         selectedFlight={selectedFlight}
         onSelectFlight={handleFlightSelect}
         airspace={data.airspace || { nodes: [], edges: [] }}
         airports={data.airports || []}
         activeAirport={activeAirport}
+        activeAirportConfig={data.config}
         onSelectAirport={setActiveAirport}
         sendWSMessage={sendWSMessage}
       />
-      
-      <FlightRoster 
+
+      <FlightRoster
         gameState={data}
-        flights={flightsList} 
+        flights={flightsList}
         onSelectFlight={handleFlightSelect}
+        sendWSMessage={sendWSMessage}
       />
-      
+
       <DevConsole actions={data.events || []} onSendCommand={handleSendCommand} />
 
       {/* Renders over everything when a flight is selected */}
-      <FlightModal 
-        flight={selectedFlight} 
+      <FlightModal
+        flight={selectedFlight}
         onClose={handleCloseModal}
       />
     </div>

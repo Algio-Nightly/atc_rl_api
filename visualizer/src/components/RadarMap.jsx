@@ -22,6 +22,44 @@ const createPlaneIcon = (heading, isSelected, scale = 1) => {
   });
 };
 
+const GATE_COLORS = {
+  "N": "#4285F4", // Blue
+  "NORTH": "#4285F4",
+  "S": "#EA4335", // Red
+  "SOUTH": "#EA4335",
+  "E": "#34A853", // Green
+  "EAST": "#34A853",
+  "W": "#FBBC05", // Yellow
+  "WEST": "#FBBC05"
+};
+
+const createWaypointIcon = (runwayId, color, scale = 1) => {
+  const size = 20 * scale;
+  return L.divIcon({
+    className: 'custom-waypoint-icon',
+    html: `
+      <div style="
+        background: ${color}; 
+        color: white; 
+        border-radius: 50%; 
+        width: ${size}px; 
+        height: ${size}px; 
+        display: flex; 
+        justify-content: center; 
+        align-items: center; 
+        font-weight: bold; 
+        font-size: ${10 * scale}px;
+        border: 2px solid white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      ">
+        ${runwayId}
+      </div>
+    `,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2]
+  });
+};
+
 export default function RadarMap({ 
   flights, 
   selectedFlight, 
@@ -29,6 +67,7 @@ export default function RadarMap({
   onSelectFlight, 
   airports = [],
   activeAirport,
+  activeAirportConfig,
   onSelectAirport,
   sendWSMessage
 }) {
@@ -121,6 +160,7 @@ export default function RadarMap({
         setIsDraftingRunway={setIsDraftingRunway}
         isRunwayBidirectional={isRunwayBidirectional}
         setIsRunwayBidirectional={setIsRunwayBidirectional}
+        sendWSMessage={sendWSMessage}
       />
 
       <MapContainer center={[activeAirport.lat, activeAirport.lon]} zoom={13} style={{ height: '100%', width: '100%' }}>
@@ -128,6 +168,32 @@ export default function RadarMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; OpenStreetMap contributors'
         />
+
+        {/* Render STAR Waypoints */}
+        {activeAirportConfig && activeAirportConfig.stars && (
+          Object.entries(activeAirportConfig.stars).map(([gateId, runwayMap]) => {
+            const color = GATE_COLORS[gateId.toUpperCase()] || '#888';
+            return Object.entries(runwayMap || {}).map(([runwayId, waypoints]) => {
+              return (waypoints || []).map((wp, idx) => {
+                const pos = xyToLatLon(wp.x, wp.y, activeAirportConfig.anchor);
+                return (
+                  <Marker 
+                    key={`wp-${gateId}-${runwayId}-${idx}`} 
+                    position={pos} 
+                    icon={createWaypointIcon(runwayId, color, 1)}
+                  >
+                    <Tooltip direction="top" offset={[0, -10]} opacity={0.9}>
+                      <div style={{ fontSize: '0.7rem' }}>
+                        <strong>{wp.name}</strong><br/>
+                        Gate: {gateId} | Alt: {wp.target_alt}ft
+                      </div>
+                    </Tooltip>
+                  </Marker>
+                );
+              });
+            });
+          })
+        )}
 
         {/* Existing Airports */}
         {airports.map(ap => {

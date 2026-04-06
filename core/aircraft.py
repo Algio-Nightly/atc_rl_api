@@ -36,10 +36,11 @@ class Aircraft:
         # STAR navigation
         self.active_star = active_star
         self.wp_index = 0
+        self.direct_to_wp = None # WaypointConfig if active
         
         # Holding logic
-        self.holding_fix = None # (x, y)
-        self.holding_radius = 3.0 # km
+        self.holding_fix = None # {"x", "y"}
+        self.holding_radius = 2.0 # km
         
         # Physics constraints
         self.turn_rate = 3.0       # Degrees per second
@@ -58,28 +59,42 @@ class Aircraft:
 
             if self.state == "HOLDING" and self.holding_fix:
                 # 0a. Holding Pattern (Orbital)
-                fx, fy = self.holding_fix
+                fx, fy = self.holding_fix["x"], self.holding_fix["y"]
                 dx = fx - self.x
                 dy = fy - self.y
                 dist_to_fix = math.sqrt(dx**2 + dy**2)
-                
-                # Angle from aircraft to fix
                 angle_to_fix = math.degrees(math.atan2(dy, dx))
                 
-                # We want to maintain holding_radius. 
-                # If too far: steer more towards fix.
-                # If too close: steer more away.
-                # Base orbit: +90 degrees from angle_to_fix for clockwise
+                # Orbit logic: Steer 90 deg from fix, with correction to maintain radius
+                # Clockwise orbit
                 offset = 90
-                # Corrective factor: steering inwards if too far
-                correction = (dist_to_fix - self.holding_radius) * 15 # 15 deg adjustment per km
-                correction = max(-60, min(60, correction))
+                correction = (dist_to_fix - self.holding_radius) * 20 # Sharp correction
+                correction = max(-70, min(70, correction))
                 
-                orbit_heading_math = (angle_to_fix + offset + correction)
-                self.target_heading = (90 - orbit_heading_math) % 360
+                target_math = (angle_to_fix + offset + correction)
+                self.target_heading = (90 - target_math) % 360
+
+            elif self.direct_to_wp:
+                # 0b. Direct-To Logic
+                dx = self.direct_to_wp["x"] - self.x
+                dy = self.direct_to_wp["y"] - self.y
+                self.target_heading = (90 - math.degrees(math.atan2(dy, dx))) % 360
+                self.target_alt = self.direct_to_wp["target_alt"]
+                self.target_speed = self.direct_to_wp["target_speed"]
+
+                if math.sqrt(dx**2 + dy**2) < 1.0:
+                    self.direct_to_wp = None # Reached, continue from current wp_index or hold
+                    # If we have a star, continue from wherever we are
+                    # (Usually direct_to is used to jump ahead in a star)
+
+            elif self.state == "APPROACH":
+                # 0c. Approach Logic (Final Alignment)
+                # Head towards airport center but strictly align with runway first
+                # For now, just maintain heading to center
+                pass
 
             elif self.active_star and self.active_star in stars:
-                # 0b. STAR Navigation Logic
+                # 0d. STAR Navigation Logic
                 waypoints = stars[self.active_star]
                 if self.wp_index < len(waypoints):
                     wp = waypoints[self.wp_index]
@@ -145,13 +160,14 @@ class Aircraft:
             self.x += (vx_ground * 1.852 / 3600) * dt
             self.y += (vy_ground * 1.852 / 3600) * dt
 
-    def get_state(self):
-        return {
+    def get_state(self, anchor=None):
+        """Returns state, projecting to lat/lon if anchor is provided"""
+        res = {
             "callsign": self.callsign,
             "type": self.type,
             "weight_class": self.weight_class,
-            "x": self.x,
-            "y": self.y,
+            "x": round(self.x, 2),
+            "y": round(self.y, 2),
             "altitude": int(self.altitude),
             "target_alt": int(self.target_alt),
             "heading": round(self.heading, 1),
@@ -165,3 +181,15 @@ class Aircraft:
             "wp_index": self.wp_index,
             "is_holding": self.state == "HOLDING"
         }
+        
+        if anchor:
+            # Re-implement planar projection
+            # Center of 50x50km is (25, 25)
+            KM_PER_DEG_LAT = 111.32
+            dx = self.x - 25
+            dy = 25 - self.y # Y increases downwards in sim
+            
+            res["lat"] = round(anchor["lat"] + (dy / KM_PER_DEG_LAT), 6)
+            res["lon"] = round(anchor["lon"] + (dx / (KM_PER_DEG_LAT * math.cos(math.radians(anchor["lat"])))), 6)
+            
+        return res
