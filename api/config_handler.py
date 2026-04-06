@@ -12,8 +12,9 @@ from atc_rl_api.api.schemas import (
     WaypointConfig, StarRouteSaveRequest
 )
 
-AIRPORTS_DIR = Path("atc_rl_api/airports")
-AIRPORTS_DIR.mkdir(exist_ok=True)
+# Calculate AIRPORTS_DIR relative to this file's location (atc_rl_api/api/config_handler.py)
+AIRPORTS_DIR = Path(__file__).parent.parent / "airports"
+AIRPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 def get_airport_path(airport_code: str) -> Path:
     return AIRPORTS_DIR / f"{airport_code.upper()}.json"
