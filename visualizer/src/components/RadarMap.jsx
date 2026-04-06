@@ -462,7 +462,7 @@ export default function RadarMap({
           background: '#222',
           borderRadius: '50%',
           border: '2px solid #00ff00',
-          transform: `rotate(${windHeading}deg)`,
+          transform: `rotate(${(windHeading + 180) % 360}deg)`,
           transition: 'transform 0.5s ease-in-out'
         }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00ff00" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">

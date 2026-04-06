@@ -93,8 +93,8 @@
       "name": "WP_3",
       "x": 7.891739680604198,
       "y": 17.90432726656076,
-      "target_alt": 3000,
-      "target_speed": 210,
+      "target_alt": 7000,
+      "target_speed": 240,
       "is_iaf": false,
       "holding_stack": []
     },
@@ -103,8 +103,8 @@
       "name": "WP_4",
       "x": 18.960646234957498,
       "y": 5.862566714489358,
-      "target_alt": 3000,
-      "target_speed": 210,
+      "target_alt": 7000,
+      "target_speed": 240,
       "is_iaf": false,
       "holding_stack": []
     },
@@ -113,8 +113,8 @@
       "name": "WP_5",
       "x": 8.094033349221684,
       "y": -14.907477814939469,
-      "target_alt": 3000,
-      "target_speed": 210,
+      "target_alt": 5000,
+      "target_speed": 220,
       "is_iaf": false,
       "holding_stack": []
     },
@@ -123,8 +123,8 @@
       "name": "WP_6",
       "x": 12.74672627376639,
       "y": -5.072422161003488,
-      "target_alt": 3000,
-      "target_speed": 210,
+      "target_alt": 5000,
+      "target_speed": 220,
       "is_iaf": false,
       "holding_stack": []
     },
@@ -133,8 +133,8 @@
       "name": "WP_7",
       "x": -13.218301982552417,
       "y": 9.11189414984579,
-      "target_alt": 3000,
-      "target_speed": 210,
+      "target_alt": 5000,
+      "target_speed": 220,
       "is_iaf": false,
       "holding_stack": []
     },
@@ -143,8 +143,8 @@
       "name": "WP_8",
       "x": -4.063003002000564,
       "y": 19.08974167052715,
-      "target_alt": 3000,
-      "target_speed": 210,
+      "target_alt": 7000,
+      "target_speed": 240,
       "is_iaf": false,
       "holding_stack": []
     }
@@ -191,5 +191,5 @@
       ]
     }
   },
-  "time_scale": 8.0
+  "time_scale": 1.0
 }

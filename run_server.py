@@ -24,21 +24,30 @@ import argparse
 
 def run_server():
     parser = argparse.ArgumentParser(description="Run the ATC Simulation Server")
-    parser.add_argument("--ui", "-u", action="store_true", help="Start the frontend UI (visualizer)")
+    parser.add_argument("--ui", "-u", action="store_true", help="Start the backend and the frontend UI")
+    parser.add_argument("--only-ui", action="store_true", help="Start ONLY the frontend UI (visualizer)")
     args = parser.parse_args()
 
-    kill_port_8000()
-    
     script_dir = os.path.dirname(os.path.abspath(__file__))
     parent_dir = os.path.dirname(script_dir)
+    ui_dir = os.path.join(script_dir, "visualizer")
+
+    if args.only_ui:
+        print("Starting ONLY Frontend (Vite)...")
+        try:
+            # Use shell=True for 'npm' on Windows
+            subprocess.run(["npm", "run", "dev"], cwd=ui_dir, shell=True)
+        except KeyboardInterrupt:
+            print("\nStopping UI...")
+        return
+
+    kill_port_8000()
     
     # Start UI if flag provided
     ui_process = None
     if args.ui:
         print("Starting Frontend (Vite)...")
-        ui_dir = os.path.join(script_dir, "visualizer")
         try:
-            # Use shell=True for 'npm' on Windows
             ui_process = subprocess.Popen(["npm", "run", "dev"], cwd=ui_dir, shell=True)
             print(f"Frontend process started (PID: {ui_process.pid})")
         except Exception as e:
@@ -61,8 +70,6 @@ def run_server():
     finally:
         if ui_process:
             print("Terminating frontend process...")
-            # On Windows, terminating a shell-started process can be tricky, 
-            # taskkill might be safer but terminate() works for simple vite dev
             ui_process.terminate()
             ui_process.wait()
 

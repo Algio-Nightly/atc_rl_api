@@ -339,6 +339,8 @@ async def websocket_endpoint(websocket: WebSocket):
                                     elif value:
                                         # Fallback for old/simple HOLD waypoint
                                         req_data["waypoint_name"] = value.upper()
+                                elif cmd_id == "ATC_LAND" and value:
+                                    req_data["runway_id"] = value.upper()
                                 
                                 result = await process_command(CommandRequest(**req_data))
                                 if "error" in result:
@@ -493,9 +495,28 @@ async def process_command(request: CommandRequest):
                 engine.event_buffer.append({"type": "ATC", "msg": f"DIRECT: {request.callsign} proceeding to {found_wp['name']}", "timestamp": time.time()})
             else:
                 return {"error": f"Waypoint '{request.waypoint_name}' not found in airport pool", "code": 404}
-    elif cmd == "ATC_APPROACH" or cmd == "ATC_LAND":
+    elif cmd == "ATC_APPROACH":
         aircraft.state = "APPROACH"
         aircraft.active_star = None
-        engine.event_buffer.append({"type": "ATC", "msg": f"CLEARED: {request.callsign} cleared for approach/landing", "timestamp": time.time()})
+        engine.event_buffer.append({"type": "ATC", "msg": f"CLEARED: {request.callsign} cleared for approach", "timestamp": time.time()})
+    elif cmd == "ATC_LAND":
+        if request.runway_id and engine.config:
+            # 1. Validation: Does runway exist?
+            rw_id = request.runway_id.upper()
+            target_rw = next((r for r in engine.config.runways if r.id == rw_id), None)
+            
+            if not target_rw:
+                return {"error": f"Runway '{rw_id}' not found in configuration", "code": 404}
+            
+            # 2. Inform Aircraft
+            aircraft.target_runway_id = rw_id
+            aircraft.runway_threshold = {"x": target_rw.start.x, "y": target_rw.start.y}
+            aircraft.runway_heading = target_rw.heading
+            aircraft.state = "APPROACH"
+            aircraft.active_star = None
+            
+            engine.event_buffer.append({"type": "ATC", "msg": f"CLEARED: {request.callsign} cleared for landing Runway {rw_id}", "timestamp": time.time()})
+        else:
+            return {"error": "ATC_LAND requires runway_id", "code": 400}
         
     return {"status": "ATC Command processed"}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function AdminOverlay({
+export default function AdminPanel({
   airports = [],
   activeAirport,
   activeAirportConfig,
@@ -15,7 +15,6 @@ export default function AdminOverlay({
   starDraft,
   setStarDraft
 }) {
-  const [isExpanded, setIsExpanded] = useState(false);
   const [editingWaypoint, setEditingWaypoint] = useState(null); // {gate, runway, index, wp}
   const [editingRunway, setEditingRunway] = useState(null); // {rw}
 
@@ -123,40 +122,16 @@ export default function AdminOverlay({
     );
   };
 
-  if (!isExpanded) {
-    return (
-      <button
-        onClick={() => setIsExpanded(true)}
-        className="btn"
-        style={{
-          position: 'absolute',
-          top: '10px',
-          right: '10px',
-          zIndex: 1000,
-          background: 'rgba(255,255,255,0.8)',
-          border: '1px solid #999',
-          padding: '4px 8px',
-          fontSize: '0.75rem',
-          borderRadius: '4px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-        }}
-      >
-        Admin Tools
-      </button>
-    );
-  }
-
   return (
-    <div className="admin-overlay">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <strong style={{ color: '#1a1a1a', fontSize: '0.85rem' }}>Admin Tools</strong>
-        <button onClick={() => setIsExpanded(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: '1.2rem' }}>&times;</button>
+    <nav className="admin-panel thin-scroll">
+      <div style={{ marginBottom: '16px' }}>
+        <h2 style={{ color: '#555', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 'bold' }}>Admin Control</h2>
       </div>
 
       {/* Simulation Speed Section */}
       <div className="section" style={{ marginBottom: '16px' }}>
-        <h4>Simulation Speed</h4>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.7rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Sim Scale</h4>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <input 
             type="range" 
             min="1" 
@@ -171,13 +146,10 @@ export default function AdminOverlay({
             }}
           />
           <span style={{ 
-            minWidth: '40px', 
+            minWidth: '35px', 
             textAlign: 'right', 
             fontWeight: 'bold', 
             color: '#007bff',
-            background: '#e7f3ff',
-            padding: '2px 6px',
-            borderRadius: '4px',
             fontSize: '0.8rem'
           }}>
             {activeAirportConfig?.time_scale || 1}x
@@ -186,112 +158,98 @@ export default function AdminOverlay({
       </div>
 
       {/* Airports Section */}
-      <div className="section">
-        <h4>Airports</h4>
-        <div style={{ maxHeight: '100px', overflowY: 'auto', border: '1px solid #dee2e6', padding: '4px', borderRadius: '4px', background: '#f8f9fa' }}>
+      <div className="section" style={{ borderTop: '1px solid #f0f0f0', paddingTop: '12px', marginTop: '12px' }}>
+        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.7rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Airports</h4>
+        <div style={{ maxHeight: '80px', overflowY: 'auto', border: '1px solid #eee', padding: '4px', borderRadius: '4px', background: '#fafafa', marginBottom: '8px' }}>
           {airports.map(ap => (
             <div
               key={ap.name}
               onClick={() => onSelectAirport(ap)}
               style={{
-                padding: '6px',
+                padding: '4px 8px',
                 cursor: 'pointer',
-                fontSize: '0.75rem',
-                borderRadius: '4px',
+                fontSize: '0.7rem',
+                borderRadius: '3px',
                 marginBottom: '2px',
                 background: activeAirport?.name === ap.name ? '#007bff' : 'none',
-                color: activeAirport?.name === ap.name ? '#fff' : '#1a1a1a'
+                color: activeAirport?.name === ap.name ? '#fff' : '#444'
               }}
             >
               {ap.name}
             </div>
           ))}
         </div>
-
-        <div style={{ marginTop: '10px' }}>
+        <div style={{ display: 'flex', gap: '4px' }}>
           <input
-            placeholder="New name..."
+            placeholder="New..."
             value={airportName}
             onChange={e => setAirportName(e.target.value)}
-            style={{ width: '100%', marginBottom: '6px' }}
+            style={{ flex: 1, padding: '4px', fontSize: '0.7rem', border: '1px solid #eee', borderRadius: '4px' }}
           />
           <button
             className="btn"
-            style={{ width: '100%', background: draftingMode === 'airport' ? '#ffcccc' : '#e7f3ff', color: '#0056b3', borderColor: '#b8daff' }}
+            style={{ 
+              padding: '4px 8px', 
+              fontSize: '0.65rem',
+              background: draftingMode === 'airport' ? '#ffcccc' : '#e7f3ff', 
+              color: '#0056b3'
+            }}
             onClick={() => setDraftingMode(draftingMode === 'airport' ? null : 'airport')}
           >
-            {draftingMode === 'airport' ? 'Click map for location...' : 'Add Airport (Click map)'}
+            {draftingMode === 'airport' ? '📍' : 'Add'}
           </button>
         </div>
       </div>
 
       {/* Runway Management */}
-      <div className="section" style={{ marginTop: '16px' }}>
-        <h4>Runways ({activeAirport?.name})</h4>
-        <div style={{ maxHeight: '100px', overflowY: 'auto', background: '#f8f9fa', padding: '6px', borderRadius: '6px', border: '1px solid #dee2e6', marginBottom: '10px' }}>
+      <div className="section" style={{ borderTop: '1px solid #f0f0f0', paddingTop: '12px', marginTop: '12px' }}>
+        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.7rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Runways ({activeAirport?.name})</h4>
+        <div style={{ maxHeight: '80px', overflowY: 'auto', background: '#fafafa', padding: '4px', borderRadius: '4px', border: '1px solid #eee', marginBottom: '8px' }}>
           {activeAirport?.runways?.map(rw => (
-            <div key={rw.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 6px', borderBottom: '1px solid #eee', color: '#1a1a1a' }}>
-              <span style={{ fontWeight: '500', fontSize: '0.75rem' }}>{rw.id} <span style={{ color: '#6c757d', fontWeight: 'normal' }}>({rw.heading}°)</span></span>
+            <div key={rw.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 4px', borderBottom: '1px solid #f9f9f9', color: '#444' }}>
+              <span style={{ fontSize: '0.65rem' }}>{rw.id} <span style={{ color: '#999' }}>{rw.heading}°</span></span>
               <div style={{ display: 'flex', gap: '4px' }}>
-                <button
-                  onClick={() => setEditingRunway({ rw })}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}
-                >✏️</button>
+                <button onClick={() => setEditingRunway({ rw })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.65rem' }}>✏️</button>
                 <button
                   onClick={() => {
                     if (window.confirm(`Delete runway ${rw.id}?`)) {
                       sendWSMessage('delete_runway', { airport_code: activeAirport.airport_code, runway_id: rw.id });
                     }
                   }}
-                  style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', fontWeight: 'bold' }}
+                  style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}
                 >&times;</button>
               </div>
             </div>
           ))}
         </div>
-        <input
-          placeholder="New Runway Label..."
-          value={runwayLabel}
-          onChange={e => setRunwayLabel(e.target.value)}
-          style={{ width: '100%', marginBottom: '6px', fontSize: '0.75rem' }}
-        />
-        <div style={{ display: 'flex', alignItems: 'center', margin: '4px 0', fontSize: '0.7rem' }}>
-          <input type="checkbox" id="bidir" checked={isRunwayBidirectional} onChange={e => setIsRunwayBidirectional(e.target.checked)} style={{ width: 'auto', marginRight: '4px' }} />
-          <label htmlFor="bidir">Bidirectional</label>
-        </div>
         <button
           className="btn"
           disabled={!activeAirport}
-          style={{ width: '100%', background: draftingMode === 'runway' ? '#ffcccc' : '#f0f0f0', fontSize: '0.75rem' }}
+          style={{ width: '100%', background: draftingMode === 'runway' ? '#ffcccc' : '#f8f9fa', fontSize: '0.65rem' }}
           onClick={() => setDraftingMode(draftingMode === 'runway' ? null : 'runway')}
         >
-          {draftingMode === 'runway' ? 'Set points on map...' : 'Add Runway (Map)'}
+          {draftingMode === 'runway' ? 'Click Map...' : 'Add Runway'}
         </button>
       </div>
 
       {/* Pooled Waypoint Dropper */}
-      <div className="section" style={{ marginTop: '16px' }}>
-        <h4>Waypoint Dropper</h4>
+      <div className="section" style={{ borderTop: '1px solid #f0f0f0', paddingTop: '12px', marginTop: '12px' }}>
+        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.7rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Waypoints</h4>
         <button
           className="btn"
-          style={{ width: '100%', background: draftingMode === 'waypoint' ? '#ffcccc' : '#e7f3ff', fontSize: '0.75rem' }}
+          style={{ width: '100%', background: draftingMode === 'waypoint' ? '#ffcccc' : '#e7f3ff', fontSize: '0.65rem', marginBottom: '8px' }}
           onClick={() => setDraftingMode(draftingMode === 'waypoint' ? null : 'waypoint')}
         >
-          {draftingMode === 'waypoint' ? 'DROPPER ACTIVE (Click Map)' : 'Activate Waypoint Dropper'}
+          {draftingMode === 'waypoint' ? 'Drop Active...' : 'Activate Dropper'}
         </button>
 
-        {/* Global Pool List */}
         {activeAirportConfig?.waypoints && Object.keys(activeAirportConfig.waypoints).length > 0 && (
-          <div style={{ marginTop: '8px', maxHeight: '100px', overflowY: 'auto', background: '#f8f9fa', borderRadius: '4px', border: '1px solid #eee' }}>
+          <div style={{ maxHeight: '80px', overflowY: 'auto', background: '#fafafa', borderRadius: '4px', border: '1px solid #eee' }}>
             {Object.values(activeAirportConfig.waypoints).map((wp) => (
-              <div key={wp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.65rem', padding: '4px' }}>
+              <div key={wp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.6rem', padding: '2px 6px', borderBottom: '1px solid #f9f9f9' }}>
                 <span>{wp.name}</span>
                 <div style={{ display: 'flex', gap: '4px' }}>
-                  <button onClick={() => setEditingWaypoint({ wp })} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>✏️</button>
-                  <button
-                    onClick={() => sendWSMessage('delete_waypoint', { airport_code: activeAirport.airport_code, waypoint_id: wp.id })}
-                    style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer' }}
-                  >&times;</button>
+                  <button onClick={() => setEditingWaypoint({ wp })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.65rem' }}>✏️</button>
                 </div>
               </div>
             ))}
@@ -300,23 +258,26 @@ export default function AdminOverlay({
       </div>
 
       {/* STAR Route Builder */}
-      <div className="section" style={{ marginTop: '16px' }}>
-        <h4>STAR Route Builder</h4>
+      <div className="section" style={{ borderTop: '1px solid #f0f0f0', paddingTop: '12px', marginTop: '12px' }}>
+        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.7rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Arrival Routes</h4>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <div style={{ display: 'flex', gap: '4px' }}>
             <select
               value={starDraft.gate}
               onChange={e => setStarDraft({ ...starDraft, gate: e.target.value })}
-              style={{ flex: 1, padding: '4px', fontSize: '0.7rem' }}
+              style={{ flex: 1, padding: '2px', fontSize: '0.65rem', border: '1px solid #eee' }}
             >
-              <option value="N">North</option><option value="S">South</option><option value="E">East</option><option value="W">West</option>
+              {activeAirportConfig?.gates ? 
+                Object.keys(activeAirportConfig.gates).map(g => <option key={g} value={g}>{g}</option>) :
+                <><option value="N">N</option><option value="S">S</option><option value="E">E</option><option value="W">W</option></>
+              }
             </select>
             <select
               value={starDraft.runway_id || ''}
               onChange={e => setStarDraft({ ...starDraft, runway_id: e.target.value })}
-              style={{ flex: 1, padding: '4px', fontSize: '0.7rem' }}
+              style={{ flex: 1, padding: '2px', fontSize: '0.65rem', border: '1px solid #eee' }}
             >
-              <option value="">Runway...</option>
+              <option value="">RWY...</option>
               {activeAirport?.runways?.map(rw => <option key={rw.id} value={rw.id}>{rw.id}</option>)}
             </select>
           </div>
@@ -324,18 +285,32 @@ export default function AdminOverlay({
           <button
             className="btn"
             disabled={!starDraft.runway_id}
-            style={{ width: '100%', background: draftingMode === 'route' ? '#ffcccc' : '#e7f3ff', fontSize: '0.75rem', fontWeight: 'bold' }}
+            style={{ width: '100%', background: draftingMode === 'route' ? '#ffcccc' : '#f8f9fa', fontSize: '0.65rem' }}
             onClick={() => setDraftingMode(draftingMode === 'route' ? null : 'route')}
           >
-            {draftingMode === 'route' ? 'Click Dots on Map...' : 'Start Route Builder'}
+            {draftingMode === 'route' ? 'Building...' : 'Build Route'}
           </button>
 
           {draftingMode === 'route' && (
-            <div style={{ padding: '6px', background: '#fff9e6', border: '1px solid #ffeeba', borderRadius: '4px', fontSize: '0.7rem' }}>
-              <strong>Sequence:</strong> {starDraft.sequence.length > 0 ? starDraft.sequence.map(id => activeAirportConfig.waypoints[id]?.name || id).join(' → ') : 'No points selected'}
-              <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
-                <button onClick={() => setStarDraft({ ...starDraft, sequence: [] })} className="btn" style={{ flex: 1 }}>Clear</button>
-                <button
+            <div style={{ padding: '6px', background: '#fff9e6', border: '1px solid #ffeeba', borderRadius: '4px', marginTop: '4px' }}>
+              <select 
+                value="" 
+                onChange={(e) => setStarDraft(prev => ({ ...prev, sequence: [...prev.sequence, e.target.value] }))} 
+                style={{ width: '100%', padding: '2px', fontSize: '0.65rem', marginBottom: '6px' }}
+              >
+                <option value="">Add Waypoint...</option>
+                {Object.values(activeAirportConfig?.waypoints || {})
+                  .sort((a,b) => a.name.localeCompare(b.name))
+                  .map(wp => <option key={wp.id} value={wp.id}>{wp.name}</option>)}
+              </select>
+              
+              <div style={{ fontSize: '0.6rem', marginBottom: '6px', color: '#666', maxHeight: '40px', overflowY: 'auto' }}>
+                {starDraft.sequence.map(id => activeAirportConfig.waypoints[id]?.name || id).join(' → ')}
+              </div>
+
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button onClick={() => setStarDraft({ ...starDraft, sequence: [] })} className="btn" style={{ flex: 1, fontSize: '0.6rem', padding: '2px' }}>Clear</button>
+                <button 
                   disabled={starDraft.sequence.length === 0}
                   onClick={() => {
                     sendWSMessage('save_star_route', {
@@ -348,8 +323,8 @@ export default function AdminOverlay({
                     setStarDraft(prev => ({ ...prev, sequence: [] }));
                   }}
                   className="btn btn-primary"
-                  style={{ flex: 1, background: '#007bff' }}
-                >Save Route</button>
+                  style={{ flex: 1, background: '#007bff', fontSize: '0.6rem', padding: '2px' }}
+                >Save</button>
               </div>
             </div>
           )}
@@ -357,63 +332,56 @@ export default function AdminOverlay({
       </div>
 
       {/* Spawn Section */}
-      <div className="section" style={{ marginTop: '16px' }}>
-        <h4>Spawn</h4>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <input placeholder="Callsign" value={spawnFields.callsign} onChange={e => setSpawnFields({ ...spawnFields, callsign: e.target.value })} style={{ width: '100%', fontSize: '0.75rem' }} />
+      <div className="section" style={{ borderTop: '1px solid #f0f0f0', paddingTop: '12px', marginTop: '12px' }}>
+        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.7rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Spawn Aircraft</h4>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <input 
+            placeholder="Callsign" 
+            value={spawnFields.callsign} 
+            onChange={e => setSpawnFields({ ...spawnFields, callsign: e.target.value })} 
+            style={{ padding: '6px', fontSize: '0.7rem', border: '1px solid #eee', borderRadius: '4px' }} 
+          />
           <div style={{ display: 'flex', gap: '4px' }}>
             <select 
               value={spawnFields.gate} 
               onChange={e => setSpawnFields({ ...spawnFields, gate: e.target.value })} 
-              style={{ flex: 1, fontSize: '0.75rem', padding: '2px' }}
+              style={{ flex: 1, fontSize: '0.65rem', padding: '4px', border: '1px solid #eee' }}
             >
               {activeAirportConfig?.gates ? 
                 Object.keys(activeAirportConfig.gates).map(g => <option key={g} value={g}>{g}</option>) :
                 <><option value="N">N</option><option value="S">S</option><option value="E">E</option><option value="W">W</option></>
               }
             </select>
-            <input type="number" placeholder="Alt" value={spawnFields.altitude} onChange={e => setSpawnFields({ ...spawnFields, altitude: e.target.value })} style={{ flex: 1, fontSize: '0.75rem' }} />
-            <input type="number" placeholder="Spd" value={spawnFields.speed} onChange={e => setSpawnFields({ ...spawnFields, speed: e.target.value })} style={{ flex: 1, fontSize: '0.75rem' }} />
+            <input type="number" placeholder="Alt" value={spawnFields.altitude} onChange={e => setSpawnFields({ ...spawnFields, altitude: e.target.value })} style={{ flex: 1, padding: '4px', fontSize: '0.65rem', border: '1px solid #eee' }} />
+            <input type="number" placeholder="Spd" value={spawnFields.speed} onChange={e => setSpawnFields({ ...spawnFields, speed: e.target.value })} style={{ flex: 1, padding: '4px', fontSize: '0.65rem', border: '1px solid #eee' }} />
           </div>
-          <button onClick={handleSpawn} className="btn btn-primary" style={{ background: '#28a745', color: 'white', border: 'none', padding: '6px', fontSize: '0.75rem' }}>Spawn</button>
+          <button onClick={handleSpawn} className="btn btn-primary" style={{ background: '#28a745', color: 'white', border: 'none', padding: '8px', fontSize: '0.7rem' }}>Spawn Flight</button>
         </div>
       </div>
 
-      <div className="section" style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
-        <button
-          className="btn"
-          style={{ flex: 1, background: '#f8f9fa', color: '#dc3545', fontSize: '0.75rem', fontWeight: 'bold' }}
-          onClick={() => sendWSMessage('reset', {})}
-        >
-          Reset
-        </button>
-        <button
-          className="btn"
-          style={{ flex: 1, background: '#dc3545', color: '#fff', fontSize: '0.75rem', fontWeight: 'bold', border: 'none' }}
+      <div style={{ marginTop: 'auto', paddingTop: '16px', display: 'flex', gap: '4px' }}>
+        <button className="btn" style={{ flex: 1, fontSize: '0.65rem', color: '#dc3545' }} onClick={() => sendWSMessage('reset', {})}>Reset</button>
+        <button 
+          className="btn" 
+          style={{ flex: 1, fontSize: '0.65rem', background: '#dc3545', color: '#fff', border: 'none' }} 
           onClick={() => {
-            if (window.confirm("Are you sure you want to SHUT DOWN the server?")) {
-              sendWSMessage('shutdown', {});
-            }
+            if (window.confirm("Shut down server?")) sendWSMessage('shutdown', {});
           }}
-        >
-          Stop Server
-        </button>
+        >Stop</button>
       </div>
 
       {renderEditModal()}
 
       <style>{`
-        .admin-overlay {
-          position: absolute; top: 15px; right: 50px; z-index: 1000;
-          background: #fff; border: 1px solid #dee2e6; padding: 12px;
-          width: 240px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-          font-family: inherit; border-radius: 8px; max-height: 90vh; overflow-y: auto;
+        .admin-panel {
+          height: 100%;
+          display: flex;
+          flex-direction: column;
         }
-        .admin-overlay h4 { margin: 0 0 8px 0; font-size: 0.7rem; color: #666; text-transform: uppercase; font-weight: bold; }
-        .admin-overlay .section { padding-top: 8px; margin-top: 8px; border-top: 1px solid #eee; }
-        .btn { cursor: pointer; border-radius: 4px; border: 1px solid #ced4da; padding: 4px 8px; font-size: 0.75rem; background: #fff; }
-        .btn-primary { background: #007bff; color: #fff; border-color: #007bff; }
+        .thin-scroll::-webkit-scrollbar { width: 4px; }
+        .thin-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
+        .thin-scroll::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
       `}</style>
-    </div>
+    </nav>
   );
 }

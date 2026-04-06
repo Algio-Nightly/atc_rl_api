@@ -4,7 +4,7 @@ import RadarMap from './components/RadarMap';
 import FlightRoster from './components/FlightRoster';
 import DevConsole from './components/DevConsole';
 import FlightModal from './components/FlightModal';
-import AdminOverlay from './components/AdminOverlay';
+import AdminPanel from './components/AdminPanel';
 import './App.css';
 
 const INITIAL_STATE = {
@@ -154,6 +154,28 @@ function App() {
 
   return (
     <div className="dashboard-container">
+      <AdminPanel
+        airports={data.airports || []}
+        activeAirport={activeAirport}
+        activeAirportConfig={data.config}
+        onSelectAirport={(ap) => {
+          setActiveAirport(ap);
+          sendWSMessage('select_airport', { code: ap.airport_code });
+        }}
+        sendWSMessage={sendWSMessage}
+        
+        draftingMode={draftingMode}
+        setDraftingMode={setDraftingMode}
+
+        airportName={airportName}
+        setAirportName={setAirportName}
+        isRunwayBidirectional={isRunwayBidirectional}
+        setIsRunwayBidirectional={setIsRunwayBidirectional}
+
+        starDraft={starDraft}
+        setStarDraft={setStarDraft}
+      />
+
       <RadarMap
         flights={flightsList}
         selectedFlight={selectedFlight}
@@ -183,28 +205,6 @@ function App() {
         setMousePos={setMousePos}
         isRunwayBidirectional={isRunwayBidirectional}
         
-        starDraft={starDraft}
-        setStarDraft={setStarDraft}
-      />
-
-      <AdminOverlay
-        airports={data.airports || []}
-        activeAirport={activeAirport}
-        activeAirportConfig={data.config}
-        onSelectAirport={(ap) => {
-          setActiveAirport(ap);
-          sendWSMessage('select_airport', { code: ap.airport_code });
-        }}
-        sendWSMessage={sendWSMessage}
-        
-        draftingMode={draftingMode}
-        setDraftingMode={setDraftingMode}
-
-        airportName={airportName}
-        setAirportName={setAirportName}
-        isRunwayBidirectional={isRunwayBidirectional}
-        setIsRunwayBidirectional={setIsRunwayBidirectional}
-
         starDraft={starDraft}
         setStarDraft={setStarDraft}
       />

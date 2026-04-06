@@ -63,6 +63,7 @@ class CommandRequest(BaseModel):
     time_scale: Optional[float] = None
     wind_heading: Optional[float] = None
     wind_speed: Optional[float] = None
+    runway_id: Optional[str] = None
 
     @field_validator("command_id")
     @classmethod

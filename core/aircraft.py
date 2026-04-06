@@ -38,9 +38,11 @@ class Aircraft:
         self.wp_index = 0
         self.direct_to_wp = None # WaypointConfig if active
         
-        # Holding logic
-        self.holding_fix = None # {"x", "y"}
-        self.holding_radius = 2.0 # km
+        # Landing & Go-Around logic
+        self.target_runway_id = None
+        self.runway_threshold = None # {"x", "y"}
+        self.runway_heading = 0.0
+        self.landing_start_dist = 0.0
         
         # Physics constraints
         self.turn_rate = 3.0       # Degrees per second
@@ -92,11 +94,91 @@ class Aircraft:
                     # If we have a star, continue from wherever we are
                     # (Usually direct_to is used to jump ahead in a star)
 
-            elif self.state == "APPROACH":
-                # 0c. Approach Logic (Final Alignment)
-                # Head towards airport center but strictly align with runway first
-                # For now, just maintain heading to center
-                pass
+            elif self.state == "APPROACH" and self.runway_threshold:
+                # 0c. Approach Logic (Phase 1: Glide Slope LERP)
+                tx, ty = self.runway_threshold["x"], self.runway_threshold["y"]
+                dx = tx - self.x
+                dy = ty - self.y
+                dist = math.sqrt(dx**2 + dy**2)
+                
+                # First time initialization
+                if self.landing_start_dist == 0:
+                    self.landing_start_dist = dist
+                
+                # Math: Calculate progress ratio (0.0 at IAF -> 1.0 at Threshold)
+                # Ensure we don't divide by zero
+                denom = max(1.0, self.landing_start_dist)
+                progress = max(0.0, min(1.0, (self.landing_start_dist - dist) / denom))
+                
+                # Glide Slope LERP
+                # Speed: Cruise -> 140 kts
+                cruise_speed = 250 # Simplified assumption or use initial speed
+                self.target_speed = cruise_speed - ((cruise_speed - 140) * progress)
+                
+                # Altitude: Start Alt -> 0 (Threshold)
+                # Assumption: Start Alt is whatever we had at the landing clearance/IAF
+                # We'll use 3000 as a standard IAF alt if not set
+                start_alt = 3000 
+                self.target_alt = start_alt * (1.0 - progress)
+                
+                # Steering: Head strictly to threshold
+                self.target_heading = (90 - math.degrees(math.atan2(dy, dx))) % 360
+                
+                # Phase 2: Touchdown Trigger (distance < 100m, alt <= 50ft)
+                if dist < 0.1 and self.altitude <= 50:
+                    # Check Runway Occupancy Lock
+                    runway_status = engine_context.get("runway_status", {})
+                    if self.target_runway_id in runway_status:
+                        lock = runway_status[self.target_runway_id]
+                        if lock["occupied_by"] is None:
+                            lock["occupied_by"] = self.callsign
+                            self.state = "LANDING"
+                            self.target_speed = 0 # Begin rolling stop
+                            self.target_alt = 0
+                            self.target_heading = self.runway_heading # Lock to runway centerline
+                        elif lock["occupied_by"] != self.callsign:
+                            # CRASH: Runway Incursion
+                            self.state = "CRASHED_RUNWAY_INCURSION"
+                            self.speed = 0
+
+            elif self.state == "LANDING":
+                # Phase 2 Continued: Rollout
+                self.target_speed = 0
+                self.target_alt = 0
+                self.target_heading = self.runway_heading
+
+            elif self.state == "GO_AROUND":
+                # Edge Case: Asleep at the Wheel / Aborted Landing
+                self.target_alt = 3000
+                self.target_speed = 180
+                
+                # Find nearest holding fix for recovery
+                all_waypoints = engine_context.get("all_waypoints", {})
+                if all_waypoints:
+                    best_fix = None
+                    min_d = float('inf')
+                    for wp in all_waypoints.values():
+                        if wp.is_iaf: # Pydantic model access
+                            d = math.sqrt((wp.x - self.x)**2 + (wp.y - self.y)**2)
+                            if d < min_d:
+                                min_d = d
+                                best_fix = wp
+                    
+                    if best_fix:
+                        self.holding_fix = {"x": best_fix.x, "y": best_fix.y}
+                        # If we reached the fix, enter holding
+                        if min_d < 1.0:
+                            self.state = "HOLDING"
+                            self.active_star = None
+                            self.wp_index = 0
+                
+                # Maintain heading until fix is determined
+                if not self.holding_fix:
+                    self.target_heading = self.runway_heading
+                else:
+                    dx = self.holding_fix["x"] - self.x
+                    dy = self.holding_fix["y"] - self.y
+                    self.target_heading = (90 - math.degrees(math.atan2(dy, dx))) % 360
 
             elif self.active_star and self.active_star in stars:
                 # 0d. STAR Navigation Logic (Multi-Runway Aware)
@@ -121,9 +203,16 @@ class Aircraft:
                     if math.sqrt(dx**2 + dy**2) < 2.0:
                         self.wp_index += 1
                         if self.wp_index >= len(selected_route):
+                            # Final Waypoint (IAF) Reached
                             self.active_star = None
                             self.wp_index = 0
-                            self.state = "APPROACH"
+                            
+                            # SAFETY CHECK: Asleep at the Wheel
+                            if self.state != "APPROACH" or self.target_runway_id is None:
+                                self.state = "GO_AROUND"
+                            else:
+                                # Proceed with APPROACH (Phase 1)
+                                pass
         
         # 1. Update Heading towards Target
         heading_diff = (self.target_heading - self.heading + 180) % 360 - 180

@@ -19,6 +19,7 @@ class SimulationEngine:
         self.wind_heading = 90.0
         self.wind_speed = 10.0
         self.active_runways: list[str] = []
+        self.runway_status: dict[str, dict] = {} # {id: {occupied_by: Optional[str]}}
         
         self.event_buffer = []
 
@@ -30,6 +31,9 @@ class SimulationEngine:
         
         # Determine initial active runways based on default wind
         self.update_weather(self.wind_heading, self.wind_speed)
+        
+        # Initialize runway status
+        self.runway_status = {r.id: {"occupied_by": None} for r in self.config.runways}
         
         self.event_buffer.append({
             "type": "AIRPORT_LOADED", 
@@ -46,6 +50,11 @@ class SimulationEngine:
             
         # Re-evaluate weather logic to ensure active runways are still valid
         self.update_weather(self.wind_heading, self.wind_speed)
+
+        # Sync runway status
+        for r in self.config.runways:
+            if r.id not in self.runway_status:
+                self.runway_status[r.id] = {"occupied_by": None}
         
         self.event_buffer.append({
             "type": "INFO", 
@@ -115,25 +124,38 @@ class SimulationEngine:
         context = {
             "wind_heading": self.wind_heading,
             "wind_speed": self.wind_speed,
-            "stars": stars
+            "stars": stars,
+            "runway_status": self.runway_status,
+            "all_waypoints": self.config.waypoints if self.config else {}
         }
         
         to_delete = []
         for callsign, aircraft in list(self.aircrafts.items()):
             aircraft.update(dt, context)
             
-            # Use (0,0) as center for landing detection
-            cx = 0
-            cy = 0
-            dist_to_airport = math.sqrt((aircraft.x - cx)**2 + (aircraft.y - cy)**2)
-            
-            if aircraft.state == "APPROACH" and dist_to_airport < 1.0:
-                self.event_buffer.append({"type": "LANDING", "callsign": callsign, "reward": 100, "timestamp": time.time()})
+            # Use assigned runway's threshold for landing detection
+            if aircraft.state == "LANDING" and aircraft.speed < 10:
+                # SUCCESSFUL LANDING Sequence
+                self.event_buffer.append({"type": "SUCCESSFUL_LANDING", "callsign": callsign, "timestamp": time.time()})
+                
+                # Release the runway lock
+                if aircraft.target_runway_id in self.runway_status:
+                    self.runway_status[aircraft.target_runway_id]["occupied_by"] = None
+                
                 to_delete.append(callsign)
             
-            if aircraft.state == "CRASHED":
+            if aircraft.state == "CRASHED" or aircraft.state == "CRASHED_RUNWAY_INCURSION":
                 self.is_terminal = True
-                self.event_buffer.append({"type": "CRASH", "callsign": callsign, "reward": -500, "timestamp": time.time()})
+                self.event_buffer.append({
+                    "type": "CRASH", 
+                    "subtype": aircraft.state,
+                    "callsign": callsign, 
+                    "timestamp": time.time()
+                })
+                # Release lock if they crash while on runway
+                if aircraft.target_runway_id in self.runway_status:
+                    if self.runway_status[aircraft.target_runway_id]["occupied_by"] == callsign:
+                        self.runway_status[aircraft.target_runway_id]["occupied_by"] = None
 
         for callsign in to_delete:
             if callsign in self.aircrafts:
@@ -152,9 +174,9 @@ class SimulationEngine:
                 # Hardcoded separation mins for now (5km/1000ft)
                 if dist < 0.5 and alt_diff < 500:
                     self.is_terminal = True
-                    self.event_buffer.append({"type": "COLLISION", "participants": [a1.callsign, a2.callsign], "reward": -1000, "timestamp": time.time()})
+                    self.event_buffer.append({"type": "COLLISION", "participants": [a1.callsign, a2.callsign], "timestamp": time.time()})
                 elif dist < 5.0 and alt_diff < 1000:
-                    self.event_buffer.append({"type": "SEPARATION_VIOLATION", "participants": [a1.callsign, a2.callsign], "reward": -50, "timestamp": time.time()})
+                    self.event_buffer.append({"type": "SEPARATION_VIOLATION", "participants": [a1.callsign, a2.callsign], "timestamp": time.time()})
 
     def reset_environment(self):
         self.aircrafts = {}
