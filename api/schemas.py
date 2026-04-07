@@ -41,8 +41,8 @@ class AircraftState(BaseModel):
     heading: float = Field(ge=0, lt=360)
     target_heading: float = Field(ge=0, lt=360)
     
-    speed: int = Field(gt=0, le=600, description="Speed in knots")
-    target_speed: int = Field(gt=0, le=600)
+    speed: int = Field(ge=0, le=600, description="Speed in knots")
+    target_speed: int = Field(ge=0, le=600)
     
     # System Status
     state: Literal["ENROUTE", "HOLDING", "APPROACH", "LANDING", "GO_AROUND", "HOLDING_SHORT", "LINE_UP", "TAKEOFF_ROLL", "CLIMB_OUT", "ON_GATE", "TAXIING", "CRASHED"]
@@ -204,6 +204,9 @@ class RunwayCreateRequest(BaseModel):
 
 class SimSetAirportRequest(BaseModel):
     airport_code: str
+
+class LLMCommandRequest(BaseModel):
+    commands: List[str]
 
 # --- Simulation State (End of file to avoid forward refs) ---
 

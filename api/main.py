@@ -18,7 +18,8 @@ from atc_rl_api.api.schemas import (
     WaypointCreateRequest,
     RunwayUpdateRequest,
     SimSetAirportRequest,
-    StarRouteSaveRequest
+    StarRouteSaveRequest,
+    LLMCommandRequest
 )
 
 class ConnectionManager:
@@ -113,6 +114,89 @@ async def get_state():
 async def reset_simulation():
     engine.reset_environment()
     return {"status": "Simulation reset"}
+
+@app.post("/llm/commands")
+async def process_llm_commands(request: LLMCommandRequest):
+    """
+    Endpoint for LLM/Batch execution of string-based commands.
+    Executes each command in sequence.
+    """
+    results = []
+    for cmd_str in request.commands:
+        res = await parse_and_process_command_str(cmd_str)
+        results.append({"command": cmd_str, "status": res})
+    return {"results": results}
+
+async def parse_and_process_command_str(payload: str):
+    """
+    Parses a raw string command (e.g. 'ATC ALTITUDE SQ123 5000') 
+    and routes it to the simulation engine.
+    """
+    payload_trimmed = payload.strip()
+    if not payload_trimmed:
+        return "Empty command"
+        
+    try:
+        parts = payload_trimmed.split()
+        cmd_prefix = parts[0].upper()
+        
+        if cmd_prefix == "ATC" and len(parts) >= 3:
+            from atc_rl_api.api.schemas import CommandRequest, CommandType
+            cmd_id = f"ATC_{parts[1].upper()}"
+            callsign = parts[2].upper()
+            value = parts[3] if len(parts) > 3 else None
+            req_data = {"type": CommandType.ATC, "command_id": cmd_id, "callsign": callsign}
+            
+            if cmd_id == "ATC_ALTITUDE" and value: req_data["new_altitude"] = float(value)
+            elif cmd_id == "ATC_VECTOR" and value: req_data["new_heading"] = float(value)
+            elif cmd_id == "ATC_SPEED" and value: req_data["new_speed"] = float(value)
+            elif cmd_id == "ATC_DIRECT_TO" and value: req_data["waypoint_name"] = value.upper()
+            elif cmd_id == "ATC_HOLD":
+                if len(parts) >= 5:
+                    # ATC HOLD UA123 POM 5000
+                    req_data["waypoint_name"] = parts[3].upper()
+                    req_data["new_altitude"] = float(parts[4])
+                elif value:
+                    req_data["waypoint_name"] = value.upper()
+            elif cmd_id == "ATC_LAND" and value:
+                req_data["runway_id"] = value.upper()
+            elif cmd_id == "ATC_TAXI" and value:
+                req_data["runway_id"] = value.upper()
+            
+            result = await process_command(CommandRequest(**req_data))
+            if "error" in result:
+                engine.event_buffer.append({"type": "ERROR", "msg": result["error"], "timestamp": time.time()})
+                return f"Error: {result['error']}"
+            return "Success"
+            
+        elif cmd_prefix == "SIM" and len(parts) >= 2:
+            from atc_rl_api.api.schemas import CommandRequest, CommandType
+            sub_cmd = parts[1].upper()
+            if sub_cmd == "WIND" and len(parts) >= 4:
+                req_data = {
+                    "type": CommandType.SIMULATION,
+                    "command_id": "CMD_SET_WIND",
+                    "wind_heading": float(parts[2]),
+                    "wind_speed": float(parts[3])
+                }
+                await process_command(CommandRequest(**req_data))
+            elif sub_cmd == "SCALE" and len(parts) >= 3:
+                await process_command(CommandRequest(
+                    type=CommandType.SIMULATION,
+                    command_id="CMD_SET_TIME_SCALE",
+                    time_scale=float(parts[2])
+                ))
+            return "Success (Sim Command)"
+        else:
+            err_msg = f"Invalid command format: {payload_trimmed}"
+            engine.event_buffer.append({"type": "ERROR", "msg": err_msg, "timestamp": time.time()})
+            return err_msg
+            
+    except Exception as e:
+        err_msg = f"Command Error: {str(e)}"
+        print(f"[ATC/SIM Parser Error] {err_msg}")
+        engine.event_buffer.append({"type": "ERROR", "msg": err_msg, "timestamp": time.time()})
+        return err_msg
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -324,68 +408,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 
                 elif msg_type == "command":
                     if isinstance(payload, str):
-                        payload_trimmed = payload.strip()
-                        upper_payload = payload_trimmed.upper()
-                        try:
-                            parts = payload_trimmed.split()
-                            if not parts: continue
-                            
-                            cmd_prefix = parts[0].upper()
-                            
-                            if cmd_prefix == "ATC" and len(parts) >= 3:
-                                from atc_rl_api.api.schemas import CommandRequest, CommandType
-                                cmd_id = f"ATC_{parts[1].upper()}"
-                                callsign = parts[2].upper()
-                                value = parts[3] if len(parts) > 3 else None
-                                req_data = {"type": CommandType.ATC, "command_id": cmd_id, "callsign": callsign}
-                                
-                                if cmd_id == "ATC_ALTITUDE" and value: req_data["new_altitude"] = float(value)
-                                elif cmd_id == "ATC_VECTOR" and value: req_data["new_heading"] = float(value)
-                                elif cmd_id == "ATC_SPEED" and value: req_data["new_speed"] = float(value)
-                                elif cmd_id == "ATC_DIRECT_TO" and value: req_data["waypoint_name"] = value.upper()
-                                elif cmd_id == "ATC_HOLD":
-                                    if len(parts) >= 5:
-                                        # ATC HOLD UA123 POM 5000
-                                        req_data["waypoint_name"] = parts[3].upper()
-                                        req_data["new_altitude"] = float(parts[4])
-                                    elif value:
-                                        # Fallback for old/simple HOLD waypoint
-                                        req_data["waypoint_name"] = value.upper()
-                                elif cmd_id == "ATC_LAND" and value:
-                                    req_data["runway_id"] = value.upper()
-                                elif cmd_id == "ATC_LINE_UP":
-                                    pass # Logic in process_command
-                                elif cmd_id == "ATC_TAKEOFF":
-                                    pass # Logic in process_command
-                                
-                                result = await process_command(CommandRequest(**req_data))
-                                if "error" in result:
-                                    engine.event_buffer.append({"type": "ERROR", "msg": result["error"], "timestamp": time.time()})
-                                
-                            elif cmd_prefix == "SIM" and len(parts) >= 2:
-                                from atc_rl_api.api.schemas import CommandRequest, CommandType
-                                sub_cmd = parts[1].upper()
-                                if sub_cmd == "WIND" and len(parts) >= 4:
-                                    req_data = {
-                                        "type": CommandType.SIMULATION,
-                                        "command_id": "CMD_SET_WIND",
-                                        "wind_heading": float(parts[2]),
-                                        "wind_speed": float(parts[3])
-                                    }
-                                    await process_command(CommandRequest(**req_data))
-                                elif sub_cmd == "SCALE" and len(parts) >= 3:
-                                    await process_command(CommandRequest(
-                                        type=CommandType.SIMULATION,
-                                        command_id="CMD_SET_TIME_SCALE",
-                                        time_scale=float(parts[2])
-                                    ))
-                                else:
-                                    engine.event_buffer.append({"type": "ERROR", "msg": f"Unknown SIM command: {sub_cmd}", "timestamp": time.time()})
-                            else:
-                                engine.event_buffer.append({"type": "ERROR", "msg": f"Invalid command format: {payload_trimmed}", "timestamp": time.time()})
-                        except Exception as e:
-                            print(f"[ATC/SIM Parser Error] {e}")
-                            engine.event_buffer.append({"type": "ERROR", "msg": f"Command Error: {str(e)}", "timestamp": time.time()})
+                        await parse_and_process_command_str(payload)
                     elif isinstance(payload, dict):
                         from atc_rl_api.api.schemas import CommandRequest
                         await process_command(CommandRequest(**payload))
