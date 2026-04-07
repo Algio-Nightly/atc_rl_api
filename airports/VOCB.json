@@ -197,7 +197,14 @@
         "IAF_RWY_1",
         "FAF_RWY_1"
       ]
+    },
+    "N": {
+      "RWY_1_REV": [
+        "c3a2fccd-7b0f-45ab-8e0c-f9bcf1031cee",
+        "IAF_RWY_1_REV",
+        "FAF_RWY_1_REV"
+      ]
     }
   },
-  "time_scale": 1.0
+  "time_scale": 8.0
 }

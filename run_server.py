@@ -53,11 +53,13 @@ def run_server():
     parent_dir = os.path.dirname(script_dir)
     ui_dir = os.path.join(script_dir, "visualizer")
 
+    # Helper to run pnpm commands robustly
+    pnpm_exe = "pnpm.cmd" if os.name == "nt" else "pnpm"
+
     if args.only_ui:
         print("Starting ONLY Frontend (Vite)...")
         try:
-            # Use shell=True for 'npm' on Windows
-            subprocess.run(["pnpm", "run", "dev"], cwd=ui_dir, shell=True)
+            subprocess.run([pnpm_exe, "run", "dev"], cwd=ui_dir)
         except KeyboardInterrupt:
             print("\nStopping UI...")
         return
@@ -69,9 +71,7 @@ def run_server():
     if args.ui:
         print("Starting Frontend (Vite)...")
         try:
-            ui_process = subprocess.Popen(
-                ["pnpm", "run", "dev"], cwd=ui_dir, shell=True
-            )
+            ui_process = subprocess.Popen([pnpm_exe, "run", "dev"], cwd=ui_dir)
             print(f"Frontend process started (PID: {ui_process.pid})")
         except Exception as e:
             print(f"Error starting frontend: {e}")
