@@ -70,10 +70,17 @@ def run_episode(
 
                 print(f"\n{'─' * 60}")
 
+            # Extract commands portion for parsing
+            commands_text = llm_response
+            if "COMMANDS:" in llm_response.upper():
+                parts = llm_response.upper().split("COMMANDS:")
+                if len(parts) > 1:
+                    commands_text = parts[1].strip()
+
             # Parse commands
             commands = []
             try:
-                parsed = parse(llm_response)
+                parsed = parse(commands_text)
                 if isinstance(parsed, list):
                     for cmd in parsed:
                         cmd_str = f"ATC {cmd['command']} {cmd['callsign']}"
