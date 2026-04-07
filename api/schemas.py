@@ -124,13 +124,14 @@ class WaypointConfig(BaseModel):
     target_alt: int = 3000
     target_speed: int = 210
     is_iaf: bool = False
+    is_faf: bool = False
     holding_stack: List[str] = [] # List of aircraft callsigns currently holding here
 
 class AirportConfig(BaseModel):
     airport_code: str
     name: str
     anchor: LatLon
-    bounds: Dict[str, float] = {"width_km": 50, "height_km": 50}
+    bounds: Dict[str, float] = {"width_km": 100, "height_km": 100}
     center: Point = Point(x=25, y=25)
     gates: Dict[str, Point]
     runways: List[RunwayConfig] = []
@@ -165,9 +166,10 @@ class StarRouteSaveRequest(BaseModel):
 
 class WaypointUpdateRequest(BaseModel):
     airport_code: str
-    gate_id: str
-    target_runway: str
-    sequence_index: int
+    waypoint_id: str # The unique UUID/ID of the waypoint in the pool
+    gate_id: Optional[str] = None
+    target_runway: Optional[str] = None
+    sequence_index: Optional[int] = None
     name: Optional[str] = None
     target_alt: Optional[int] = None
     target_speed: Optional[int] = None

@@ -6,8 +6,8 @@
     "lon": 77.039218
   },
   "bounds": {
-    "width_km": 50.0,
-    "height_km": 50.0
+    "width_km": 100.0,
+    "height_km": 100.0
   },
   "center": {
     "x": 0.0,
@@ -16,178 +16,186 @@
   "gates": {
     "N": {
       "x": 0.0,
-      "y": 25.0
+      "y": 45.0
     },
     "S": {
       "x": 0.0,
-      "y": -25.0
+      "y": -45.0
     },
     "E": {
-      "x": 25.0,
+      "x": 45.0,
       "y": 0.0
     },
     "W": {
-      "x": -25.0,
+      "x": -45.0,
       "y": 0.0
     }
   },
   "runways": [
     {
       "id": "RWY_1",
-      "heading": 45.32131849142394,
-      "length_km": 2.922062482052049,
+      "heading": 45.635345751497525,
+      "length_km": 2.965217254851096,
       "start": {
-        "x": -0.4529366061375418,
-        "y": -0.8451722971700355
+        "x": -0.4704499936863352,
+        "y": -0.8679408896767965
       },
       "end": {
-        "x": 1.624828480121083,
-        "y": 1.2094180258240324
+        "x": 1.6493961742692762,
+        "y": 1.2054055822546506
       },
       "iaf": {
-        "x": -7.123738383850359,
-        "y": -7.441569969719234
+        "x": -14.768533309420064,
+        "y": -14.85238987761825
       }
     },
     {
       "id": "RWY_1_REV",
-      "heading": 225.32131849142394,
-      "length_km": 2.922062482052049,
+      "heading": 225.63534575149754,
+      "length_km": 2.965217254851096,
       "start": {
-        "x": 1.624828480121083,
-        "y": 1.2094180258240324
+        "x": 1.6493961742692762,
+        "y": 1.2054055822546506
       },
       "end": {
-        "x": -0.4529366061375418,
-        "y": -0.8451722971700355
+        "x": -0.4704499936863352,
+        "y": -0.8679408896767965
       },
       "iaf": {
-        "x": 8.643865307104694,
-        "y": 8.15016663924282
+        "x": 15.947479490003007,
+        "y": 15.189854570196102
       }
     }
   ],
   "waypoints": {
-    "IAF-RWY_1": {
-      "id": "IAF-RWY_1",
-      "name": "IAF-RWY_1",
-      "x": -7.123738383850359,
-      "y": -7.441569969719234,
-      "target_alt": 3000,
+    "FAF_RWY_1": {
+      "id": "FAF_RWY_1",
+      "name": "FAF_RWY_1",
+      "x": -6.9045874857665135,
+      "y": -7.160942934250451,
+      "target_alt": 2000,
+      "target_speed": 180,
+      "is_iaf": false,
+      "is_faf": true,
+      "holding_stack": []
+    },
+    "IAF_RWY_1": {
+      "id": "IAF_RWY_1",
+      "name": "IAF_RWY_1",
+      "x": -14.768533309420064,
+      "y": -14.85238987761825,
+      "target_alt": 4000,
       "target_speed": 210,
       "is_iaf": true,
+      "is_faf": false,
       "holding_stack": []
     },
-    "IAF-RWY_1_REV": {
-      "id": "IAF-RWY_1_REV",
-      "name": "IAF-RWY_1_REV",
-      "x": 8.643865307104694,
-      "y": 8.15016663924282,
-      "target_alt": 3000,
+    "FAF_RWY_1_REV": {
+      "id": "FAF_RWY_1_REV",
+      "name": "FAF_RWY_1_REV",
+      "x": 8.083533666349455,
+      "y": 7.498407626828303,
+      "target_alt": 2000,
+      "target_speed": 180,
+      "is_iaf": false,
+      "is_faf": true,
+      "holding_stack": []
+    },
+    "IAF_RWY_1_REV": {
+      "id": "IAF_RWY_1_REV",
+      "name": "IAF_RWY_1_REV",
+      "x": 15.947479490003007,
+      "y": 15.189854570196102,
+      "target_alt": 4000,
       "target_speed": 210,
       "is_iaf": true,
+      "is_faf": false,
       "holding_stack": []
     },
-    "b2a2bcdf-bc6c-4c71-a6b4-9b76f55d14c8": {
-      "id": "b2a2bcdf-bc6c-4c71-a6b4-9b76f55d14c8",
-      "name": "WP_3",
-      "x": 7.891739680604198,
-      "y": 17.90432726656076,
-      "target_alt": 7000,
-      "target_speed": 240,
-      "is_iaf": false,
-      "holding_stack": []
-    },
-    "319ee389-0435-4dd4-93a6-e7bb8d2caade": {
-      "id": "319ee389-0435-4dd4-93a6-e7bb8d2caade",
-      "name": "WP_4",
-      "x": 18.960646234957498,
-      "y": 5.862566714489358,
-      "target_alt": 7000,
-      "target_speed": 240,
-      "is_iaf": false,
-      "holding_stack": []
-    },
-    "a8149f8d-e8a6-49f0-a7bb-14b5d54a1077": {
-      "id": "a8149f8d-e8a6-49f0-a7bb-14b5d54a1077",
+    "f7730339-0a3c-4522-ae58-5d97fb83146f": {
+      "id": "f7730339-0a3c-4522-ae58-5d97fb83146f",
       "name": "WP_5",
-      "x": 8.094033349221684,
-      "y": -14.907477814939469,
-      "target_alt": 5000,
-      "target_speed": 220,
+      "x": -32.361666076089456,
+      "y": -11.977717652592183,
+      "target_alt": 3000,
+      "target_speed": 210,
       "is_iaf": false,
+      "is_faf": false,
       "holding_stack": []
     },
-    "00a43cfb-f99c-4593-a32a-185097bb412d": {
-      "id": "00a43cfb-f99c-4593-a32a-185097bb412d",
+    "2dede030-03c4-4a42-93d3-e39249f114bb": {
+      "id": "2dede030-03c4-4a42-93d3-e39249f114bb",
       "name": "WP_6",
-      "x": 12.74672627376639,
-      "y": -5.072422161003488,
-      "target_alt": 5000,
-      "target_speed": 220,
+      "x": -9.699947749595495,
+      "y": -28.124057110274453,
+      "target_alt": 3000,
+      "target_speed": 210,
       "is_iaf": false,
+      "is_faf": false,
       "holding_stack": []
     },
-    "62edca19-864c-4a5a-822b-aeaf54d3449d": {
-      "id": "62edca19-864c-4a5a-822b-aeaf54d3449d",
+    "81c04ec3-9844-4d10-8e76-ab11e7581af5": {
+      "id": "81c04ec3-9844-4d10-8e76-ab11e7581af5",
       "name": "WP_7",
-      "x": -13.218301982552417,
-      "y": 9.11189414984579,
-      "target_alt": 5000,
-      "target_speed": 220,
+      "x": 14.912779439451732,
+      "y": -27.523123027911467,
+      "target_alt": 3000,
+      "target_speed": 210,
       "is_iaf": false,
+      "is_faf": false,
       "holding_stack": []
     },
-    "57e58084-c5ca-4bc0-a1e2-b3c5df880ec6": {
-      "id": "57e58084-c5ca-4bc0-a1e2-b3c5df880ec6",
+    "8c3c2eb5-1555-4764-919f-1c4702240521": {
+      "id": "8c3c2eb5-1555-4764-919f-1c4702240521",
       "name": "WP_8",
-      "x": -4.063003002000564,
-      "y": 19.08974167052715,
-      "target_alt": 7000,
-      "target_speed": 240,
+      "x": 28.194647465246543,
+      "y": -5.8216503812600235,
+      "target_alt": 3000,
+      "target_speed": 210,
       "is_iaf": false,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "3c679d2b-23b9-425d-a2a5-97a7eaf70783": {
+      "id": "3c679d2b-23b9-425d-a2a5-97a7eaf70783",
+      "name": "WP_9",
+      "x": 33.672480040859355,
+      "y": 14.740233380756242,
+      "target_alt": 3000,
+      "target_speed": 210,
+      "is_iaf": false,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "c3a2fccd-7b0f-45ab-8e0c-f9bcf1031cee": {
+      "id": "c3a2fccd-7b0f-45ab-8e0c-f9bcf1031cee",
+      "name": "WP_10",
+      "x": 13.26766959780447,
+      "y": 33.335077595054685,
+      "target_alt": 3000,
+      "target_speed": 210,
+      "is_iaf": false,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "995a5815-613e-4732-a8f6-d66181079d32": {
+      "id": "995a5815-613e-4732-a8f6-d66181079d32",
+      "name": "WP_11",
+      "x": -19.974519867886784,
+      "y": 25.986566990498712,
+      "target_alt": 4000,
+      "target_speed": 210,
+      "is_iaf": false,
+      "is_faf": false,
       "holding_stack": []
     }
   },
   "stars": {
-    "N": {
-      "RWY_1": [
-        "IAF-RWY_1"
-      ],
-      "RWY_1_REV": [
-        "b2a2bcdf-bc6c-4c71-a6b4-9b76f55d14c8",
-        "IAF-RWY_1_REV"
-      ]
-    },
-    "S": {
-      "RWY_1": [
-        "IAF-RWY_1"
-      ],
-      "RWY_1_REV": [
-        "a8149f8d-e8a6-49f0-a7bb-14b5d54a1077",
-        "00a43cfb-f99c-4593-a32a-185097bb412d",
-        "319ee389-0435-4dd4-93a6-e7bb8d2caade",
-        "IAF-RWY_1_REV"
-      ]
-    },
-    "E": {
-      "RWY_1": [
-        "IAF-RWY_1"
-      ],
-      "RWY_1_REV": [
-        "319ee389-0435-4dd4-93a6-e7bb8d2caade",
-        "IAF-RWY_1_REV"
-      ]
-    },
     "W": {
       "RWY_1": [
-        "IAF-RWY_1"
-      ],
-      "RWY_1_REV": [
-        "62edca19-864c-4a5a-822b-aeaf54d3449d",
-        "57e58084-c5ca-4bc0-a1e2-b3c5df880ec6",
-        "b2a2bcdf-bc6c-4c71-a6b4-9b76f55d14c8",
-        "IAF-RWY_1_REV"
+        "f7730339-0a3c-4522-ae58-5d97fb83146f",
+        "IAF_RWY_1",
+        "FAF_RWY_1"
       ]
     }
   },

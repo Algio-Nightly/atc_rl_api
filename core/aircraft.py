@@ -50,6 +50,13 @@ class Aircraft:
         self.alt_rate = 25.0       # Feet per second (~1500 fpm)
         self.fuel_burn_rate = 0.01 # Fuel % per second
 
+        # Holding Pattern State
+        self.holding_fix = None
+        self.holding_radius = 5.0
+        
+        # Queued Landing State (Delayed Landing)
+        self.queued_landing = None # {runway_id, threshold, heading}
+
     def update(self, dt: float, engine_context: dict = None):
         """Update physics kinematics for the given time step dt"""
         
@@ -207,12 +214,17 @@ class Aircraft:
                             self.active_star = None
                             self.wp_index = 0
                             
-                            # SAFETY CHECK: Asleep at the Wheel
-                            if self.state != "APPROACH" or self.target_runway_id is None:
-                                self.state = "GO_AROUND"
+                            # CHECK: Is there a queued landing?
+                            if self.queued_landing:
+                                ql = self.queued_landing
+                                self.target_runway_id = ql["runway_id"]
+                                self.runway_threshold = ql["threshold"]
+                                self.runway_heading = ql["runway_heading"]
+                                self.state = "APPROACH"
+                                self.queued_landing = None # Clear after transition
                             else:
-                                # Proceed with APPROACH (Phase 1)
-                                pass
+                                # SAFETY CHECK: No instructions after STAR
+                                self.state = "GO_AROUND"
         
         # 1. Update Heading towards Target
         heading_diff = (self.target_heading - self.heading + 180) % 360 - 180

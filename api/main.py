@@ -230,6 +230,8 @@ async def websocket_endpoint(websocket: WebSocket):
                         
                     req = WaypointUpdateRequest(
                         airport_code=ap_code,
+                        # Support multiple keys for waypoint ID to be extra safe
+                        waypoint_id=payload.get("waypoint_id") or payload.get("id") or payload.get("wp_id"),
                         gate_id=payload.get("gate"),
                         target_runway=payload.get("runway_id"),
                         sequence_index=payload.get("index"),
@@ -508,14 +510,14 @@ async def process_command(request: CommandRequest):
             if not target_rw:
                 return {"error": f"Runway '{rw_id}' not found in configuration", "code": 404}
             
-            # 2. Inform Aircraft
-            aircraft.target_runway_id = rw_id
-            aircraft.runway_threshold = {"x": target_rw.start.x, "y": target_rw.start.y}
-            aircraft.runway_heading = target_rw.heading
-            aircraft.state = "APPROACH"
-            aircraft.active_star = None
+            # 2. Queue the Landing instead of immediate transition
+            aircraft.queued_landing = {
+                "runway_id": rw_id,
+                "threshold": {"x": target_rw.start.x, "y": target_rw.start.y},
+                "runway_heading": target_rw.heading
+            }
             
-            engine.event_buffer.append({"type": "ATC", "msg": f"CLEARED: {request.callsign} cleared for landing Runway {rw_id}", "timestamp": time.time()})
+            engine.event_buffer.append({"type": "ATC", "msg": f"QUEUED: {request.callsign} cleared for landing Runway {rw_id} (Arrival sequence will be completed first)", "timestamp": time.time()})
         else:
             return {"error": "ATC_LAND requires runway_id", "code": 400}
         

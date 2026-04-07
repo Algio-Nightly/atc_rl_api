@@ -32,12 +32,18 @@ const GATE_COLORS = {
   "WEST": "#FBBC05"
 };
 
-const createWaypointIcon = (label, color, scale = 1, isIAF = false) => {
-  const visualSize = (isIAF ? 42 : 36) * scale;
-  const hitAreaSize = visualSize * 4.0; // DRAMATICALLY increased hit area
-  const borderRadius = isIAF ? '2px' : '50%';
+const createWaypointIcon = (label, color, scale = 1, isIAF = false, isFAF = false) => {
+  const visualSize = (isIAF || isFAF ? 42 : 36) * scale;
+  const hitAreaSize = visualSize * 4.0;
+  const borderRadius = isIAF ? '2px' : (isFAF ? '50%' : '50%');
   const transform = isIAF ? 'rotate(45deg)' : 'none';
   const labelTransform = isIAF ? 'rotate(-45deg)' : 'none';
+  
+  // Custom styling for FAF
+  const fafColor = '#FF8C00'; // DarkOrange
+  const finalColor = isFAF ? fafColor : color;
+  const border = isFAF ? '3px solid #fff' : '2px solid white';
+  const boxShadow = isFAF ? '0 0 15px rgba(255, 140, 0, 0.8)' : '0 4px 10px rgba(0,0,0,0.5)';
 
   return L.divIcon({
     className: 'custom-waypoint-icon',
@@ -53,7 +59,7 @@ const createWaypointIcon = (label, color, scale = 1, isIAF = false) => {
         pointer-events: auto; /* Explicitly catch events */
       ">
         <div class="waypoint-visual-marker" style="
-          background: ${color}; 
+          background: ${finalColor}; 
           color: white; 
           border-radius: ${borderRadius}; 
           width: ${visualSize}px; 
@@ -62,9 +68,9 @@ const createWaypointIcon = (label, color, scale = 1, isIAF = false) => {
           justify-content: center; 
           align-items: center; 
           font-weight: bold; 
-          font-size: ${Math.max(10, (isIAF ? 12 : 13) * scale)}px;
-          border: 2px solid white;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+          font-size: ${Math.max(10, (isIAF || isFAF ? 12 : 13) * scale)}px;
+          border: ${border};
+          box-shadow: ${boxShadow};
           transform: ${transform};
           pointer-events: none;
         ">
@@ -102,7 +108,8 @@ export default function RadarMap({
   setStarDraft,
   activeRunways = [],
   windHeading = 0,
-  windSpeed = 0
+  windSpeed = 0,
+  setHoveredWaypoint
 }) {
   const [clickedInfo, setClickedInfo] = React.useState(null);
   const [toastKey, setToastKey] = React.useState(0);
@@ -193,19 +200,31 @@ export default function RadarMap({
           attribution='&copy; OpenStreetMap contributors'
         />
 
-        {/* Airspace Boundary (50km Diameter / 25km Radius) */}
-        <Circle
-          center={[activeAirport.lat, activeAirport.lon]}
-          radius={25000}
-          pathOptions={{ color: '#007bff', weight: 2, dashArray: '10, 10', fillOpacity: 0.05 }}
-        />
+        {/* Radar Range Rings (10, 20, 30, 45 km) */}
+        {[10000, 20000, 30000, 45000].map(r => (
+          <Circle
+            key={`ring-${r}`}
+            center={[activeAirport.lat, activeAirport.lon]}
+            radius={r}
+            pathOptions={{ 
+              color: r === 45000 ? '#007bff' : '#ccc', 
+              weight: r === 45000 ? 2 : 1, 
+              dashArray: '10, 10', 
+              fillOpacity: r === 45000 ? 0.02 : 0 
+            }}
+          >
+             <Tooltip permanent direction="top" opacity={0.5}>
+              <span style={{ fontSize: '0.6rem', color: '#999' }}>{r/1000} KM</span>
+            </Tooltip>
+          </Circle>
+        ))}
 
-        {/* Cardinal Gate Markers */}
+        {/* Cardinal Gate Markers (Now at 45km Boundary) */}
         {Object.entries({
-          "NORTH": [0, 25],
-          "SOUTH": [0, -25],
-          "EAST": [25, 0],
-          "WEST": [-25, 0]
+          "NORTH": [0, 45],
+          "SOUTH": [0, -45],
+          "EAST": [45, 0],
+          "WEST": [-45, 0]
         }).map(([name, xy]) => {
           const pos = xyToLatLon(xy[0], xy[1], { lat: activeAirport.lat, lon: activeAirport.lon });
           const color = GATE_COLORS[name] || '#888';
@@ -234,13 +253,14 @@ export default function RadarMap({
           Object.values(activeAirportConfig.waypoints).map((wp) => {
             const pos = xyToLatLon(wp.x, wp.y, activeAirport);
             const isIAF = wp.is_iaf || wp.name?.includes("IAF");
+            const isFAF = wp.is_faf || wp.name?.includes("FAF");
             const color = isIAF ? "#4B0082" : "#555"; // Neutral gray for non-assigned points
 
             return (
               <Marker
                 key={`wp-pool-${wp.id}`}
                 position={pos}
-                icon={createWaypointIcon(isIAF ? "IAF" : "WP", color, 0.9, isIAF)}
+                icon={createWaypointIcon(isIAF ? "IAF" : (isFAF ? "FAF" : "WP"), color, 0.9, isIAF, isFAF)}
                 eventHandlers={{
                   click: (e) => {
                     if (draftingMode === 'route') {
@@ -251,7 +271,9 @@ export default function RadarMap({
                         sequence: [...prev.sequence, wp.id]
                       }));
                     }
-                  }
+                  },
+                  mouseover: () => setHoveredWaypoint(wp),
+                  mouseout: () => setHoveredWaypoint(null)
                 }}
               >
                 <Tooltip direction="top" offset={[0, -10]}>

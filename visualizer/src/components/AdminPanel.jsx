@@ -54,9 +54,7 @@ export default function AdminPanel({
       if (isWaypoint) {
         sendWSMessage('update_waypoint', {
           airport_code: activeAirport.airport_code,
-          gate: editingWaypoint.gate,
-          runway_id: editingWaypoint.runway,
-          index: editingWaypoint.index,
+          waypoint_id: editingWaypoint.wp.id,
           name: formData.get('name'),
           target_alt: parseInt(formData.get('alt')),
           target_speed: parseInt(formData.get('speed'))

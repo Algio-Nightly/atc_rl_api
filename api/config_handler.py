@@ -34,9 +34,9 @@ def save_airport_config(config: AirportConfig):
         json.dump(config.model_dump(), f, indent=2)
 
 def create_airport(req: AirportCreateRequest) -> AirportConfig:
-    # 50x50km setup
-    width = 50.0
-    height = 50.0
+    # 100x100km setup
+    width = 100.0
+    height = 100.0
     center_x = width / 2.0
     center_y = height / 2.0
     
@@ -44,13 +44,13 @@ def create_airport(req: AirportCreateRequest) -> AirportConfig:
         airport_code=req.airport_code.upper(),
         name=req.name,
         anchor=LatLon(lat=req.anchor_lat, lon=req.anchor_lon),
-        bounds={"width_km": 50.0, "height_km": 50.0},
+        bounds={"width_km": 100.0, "height_km": 100.0},
         center=Point(x=0, y=0),
         gates={
-            "N": Point(x=0, y=25.0),
-            "S": Point(x=0, y=-25.0),
-            "E": Point(x=25.0, y=0),
-            "W": Point(x=-25.0, y=0)
+            "N": Point(x=0, y=45.0),
+            "S": Point(x=0, y=-45.0),
+            "E": Point(x=45.0, y=0),
+            "W": Point(x=-45.0, y=0)
         },
         runways=[],
         stars={}
@@ -84,6 +84,30 @@ def xy_to_latLon_list(x: float, y: float, anchor: LatLon) -> list:
     lon = anchor.lon + (dx / (KM_PER_DEG_LAT * math.cos(math.radians(anchor.lat))))
     return [round(lat, 6), round(lon, 6)]
 
+def _add_approach_fixes(config: AirportConfig, rw_id: str, threshold: Point, heading: float) -> Point:
+    """Internal helper to project FAF (9km) and IAF (20km) along extended centerline"""
+    rad = math.radians(heading)
+    # Unit vector in direction of landing (HEADING 0 is North +Y, 90 is East +X)
+    dx = math.sin(rad)
+    dy = math.cos(rad)
+    
+    # 1. Final Approach Fix (FAF) - 9km
+    faf_p = Point(x=threshold.x - dx * 9.0, y=threshold.y - dy * 9.0)
+    faf_id = f"FAF_{rw_id}"
+    config.waypoints[faf_id] = WaypointConfig(
+        id=faf_id, name=faf_id, x=faf_p.x, y=faf_p.y,
+        target_alt=2000, target_speed=180, is_iaf=False, is_faf=True
+    )
+    
+    # 2. Initial Approach Fix (IAF) - 20km
+    iaf_p = Point(x=threshold.x - dx * 20.0, y=threshold.y - dy * 20.0)
+    iaf_id = f"IAF_{rw_id}"
+    config.waypoints[iaf_id] = WaypointConfig(
+        id=iaf_id, name=iaf_id, x=iaf_p.x, y=iaf_p.y,
+        target_alt=4000, target_speed=210, is_iaf=True
+    )
+    return iaf_p
+
 def add_runway_from_geo(airport_code: str, start_latlon: list, end_latlon: list, bidirectional: bool = False) -> AirportConfig:
     # Find airport by code
     config = load_airport_config(airport_code)
@@ -100,29 +124,9 @@ def add_runway_from_geo(airport_code: str, start_latlon: list, end_latlon: list,
     # Aviation: 0 North (+Y), 90 East (+X)
     heading = (90 - math.degrees(math.atan2(dy, dx))) % 360
     
-    def generate_iaf(start, way_dx, way_dy):
-        # 8-10km before threshold
-        iaf_dist = random.uniform(8.0, 10.0)
-        # Heading is from Start TO End. IAF is behind Start.
-        # Normalize vector
-        d_len = math.sqrt(way_dx**2 + way_dy**2)
-        norm_dx = way_dx / d_len
-        norm_dy = way_dy / d_len
-        return Point(x=start.x - norm_dx * iaf_dist, y=start.y - norm_dy * iaf_dist)
-
     rw_id = f"RWY_{len(config.runways) + 1}"
-    iaf_point = generate_iaf(p1, dx, dy)
-    
-    iaf_id = f"IAF-{rw_id}"
-    iaf_wp = WaypointConfig(
-        id=iaf_id,
-        name=iaf_id,
-        x=iaf_point.x,
-        y=iaf_point.y,
-        target_alt=3000,
-        target_speed=210,
-        is_iaf=True
-    )
+    # Automatically project FAF/IAF
+    iaf_point = _add_approach_fixes(config, rw_id, p1, heading)
     
     new_runway = RunwayConfig(
         id=rw_id,
@@ -134,24 +138,13 @@ def add_runway_from_geo(airport_code: str, start_latlon: list, end_latlon: list,
     )
     
     config.runways.append(new_runway)
-    # Add IAF to pool, but NOT to routes (per user instructions)
-    config.waypoints[iaf_id] = iaf_wp
     
     if bidirectional:
         # Create reverse runway (180 deg opposite)
         rev_id = f"{rw_id}_REV"
         rev_heading = (heading + 180) % 360
-        rev_iaf_point = generate_iaf(p2, -dx, -dy)
-        rev_iaf_id = f"IAF-{rev_id}"
-        rev_iaf_wp = WaypointConfig(
-            id=rev_iaf_id,
-            name=rev_iaf_id,
-            x=rev_iaf_point.x,
-            y=rev_iaf_point.y,
-            target_alt=3000,
-            target_speed=210,
-            is_iaf=True
-        )
+        # Automatically project FAF/IAF for the reverse side (start of reverse is p2)
+        rev_iaf_point = _add_approach_fixes(config, rev_id, p2, rev_heading)
         
         config.runways.append(RunwayConfig(
             id=rev_id,
@@ -161,8 +154,6 @@ def add_runway_from_geo(airport_code: str, start_latlon: list, end_latlon: list,
             end=p1,
             iaf=rev_iaf_point
         ))
-        # Add reverse IAF to pool
-        config.waypoints[rev_iaf_id] = rev_iaf_wp
         
     save_airport_config(config)
     return config
@@ -173,8 +164,7 @@ def add_runway(req: RunwayCreateRequest) -> AirportConfig:
     if not config:
         raise ValueError(f"Airport {req.airport_code} not found")
         
-    # Math for runway endpoints
-    # Aviation heading 0 is North (+Y), 90 is East (+X)
+    # Math for runway endpoints (heading 0=N, 90=E)
     rad = math.radians(req.heading)
     dx = math.sin(rad)
     dy = math.cos(rad)
@@ -185,9 +175,8 @@ def add_runway(req: RunwayCreateRequest) -> AirportConfig:
     start_p = Point(x=cx - dx * half_len, y=cy - dy * half_len)
     end_p = Point(x=cx + dx * half_len, y=cy + dy * half_len)
     
-    # IAF: 8-10km before threshold
-    iaf_dist = random.uniform(8.0, 10.0)
-    iaf_p = Point(x=start_p.x - dx * iaf_dist, y=start_p.y - dy * iaf_dist)
+    # Automatically project FAF/IAF
+    iaf_p = _add_approach_fixes(config, req.runway_id, start_p, req.heading)
     
     new_runway = RunwayConfig(
         id=req.runway_id,
@@ -240,18 +229,19 @@ def update_waypoint(req: WaypointUpdateRequest) -> AirportConfig:
     if not config:
         raise ValueError(f"Airport {req.airport_code} not found")
         
-    # In pool architecture, we look it up from the global pool either by sequence in a route or ID
-    # But usually, it's better to update by ID directly. 
-    # For now, let's look for any waypoint in the pool that might match (or we should update by ID)
-    # Refactoring WaypointUpdateRequest to include ID would be better.
-    # Let's assume for now we look in config.waypoints
-    
-    for wp in config.waypoints.values():
-        if wp.id == req.gate_id: # Reusing existing field temporarily or assuming gate_id was used as ID
-            if req.name is not None: wp.name = req.name
-            if req.target_alt is not None: wp.target_alt = req.target_alt
-            if req.target_speed is not None: wp.target_speed = req.target_speed
-            break
+    # Pool architecture: lookup by waypoint_id
+    if req.waypoint_id in config.waypoints:
+        wp = config.waypoints[req.waypoint_id]
+        if req.name is not None: wp.name = req.name
+        if req.target_alt is not None: wp.target_alt = req.target_alt
+        if req.target_speed is not None: wp.target_speed = req.target_speed
+    else:
+        # Fallback: find by name if ID lookup fails (old waypoints)
+        for wp in config.waypoints.values():
+            if wp.name == req.name:
+                if req.target_alt is not None: wp.target_alt = req.target_alt
+                if req.target_speed is not None: wp.target_speed = req.target_speed
+                break
             
     save_airport_config(config)
     return config

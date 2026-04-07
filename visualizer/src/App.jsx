@@ -26,6 +26,7 @@ function App() {
   const [logs, setLogs] = useState([]);
   const [selectedFlight, setSelectedFlight] = useState(null);
   const [activeAirport, setActiveAirport] = useState({ ...DEFAULT_CENTER, name: "Loading..." });
+  const [hoveredWaypoint, setHoveredWaypoint] = useState(null);
   
   // Drafting States (Unified)
   const [draftingMode, setDraftingMode] = useState(null); // null | 'airport' | 'runway' | 'waypoint' | 'route'
@@ -207,6 +208,7 @@ function App() {
         
         starDraft={starDraft}
         setStarDraft={setStarDraft}
+        setHoveredWaypoint={setHoveredWaypoint}
       />
 
       <FlightRoster
@@ -214,6 +216,7 @@ function App() {
         flights={flightsList}
         onSelectFlight={handleFlightSelect}
         sendWSMessage={sendWSMessage}
+        hoveredWaypoint={hoveredWaypoint}
       />
 
       <DevConsole actions={logs} onSendCommand={handleSendCommand} />
