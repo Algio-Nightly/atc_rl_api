@@ -9,7 +9,7 @@ from atc_rl_api.api.schemas import (
     AirportCreateRequest, RunwayCreateRequest, 
     WaypointCreateRequest, WaypointDeleteRequest,
     WaypointUpdateRequest, RunwayUpdateRequest,
-    WaypointConfig, StarRouteSaveRequest
+    WaypointConfig, StarRouteSaveRequest, SidRouteSaveRequest
 )
 
 # Calculate AIRPORTS_DIR relative to this file's location (atc_rl_api/api/config_handler.py)
@@ -289,6 +289,22 @@ def save_star_route(req: StarRouteSaveRequest) -> AirportConfig:
         config.stars[req.gate_id] = {}
         
     config.stars[req.gate_id][req.runway_id] = req.route_sequence
+    if req.name:
+        config.star_names[f"{req.gate_id}:{req.runway_id}"] = req.name
+    save_airport_config(config)
+    return config
+
+def save_sid_route(req: SidRouteSaveRequest) -> AirportConfig:
+    config = load_airport_config(req.airport_code)
+    if not config:
+        raise ValueError(f"Airport {req.airport_code} not found")
+        
+    if req.runway_id not in config.sids:
+        config.sids[req.runway_id] = {}
+        
+    config.sids[req.runway_id][req.gate_id] = req.route_sequence
+    if req.name:
+        config.sid_names[f"{req.runway_id}:{req.gate_id}"] = req.name
     save_airport_config(config)
     return config
 

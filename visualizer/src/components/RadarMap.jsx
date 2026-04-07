@@ -106,6 +106,8 @@ export default function RadarMap({
   isRunwayBidirectional,
   starDraft,
   setStarDraft,
+  sidDraft,
+  setSidDraft,
   activeRunways = [],
   windHeading = 0,
   windSpeed = 0,
@@ -269,11 +271,10 @@ export default function RadarMap({
                   click: (e) => {
                     if (draftingMode === 'route') {
                       if (e.originalEvent) e.originalEvent.stopPropagation();
-                      // Add to current draft sequence
-                      setStarDraft(prev => ({
-                        ...prev,
-                        sequence: [...prev.sequence, wp.id]
-                      }));
+                      setStarDraft(prev => ({ ...prev, sequence: [...prev.sequence, wp.id] }));
+                    } else if (draftingMode === 'sid_route') {
+                      if (e.originalEvent) e.originalEvent.stopPropagation();
+                      setSidDraft(prev => ({ ...prev, sequence: [...prev.sequence, wp.id] }));
                     }
                   },
                   mouseover: () => setHoveredWaypoint(wp),
@@ -315,6 +316,30 @@ export default function RadarMap({
           })
         )}
 
+        {/* Render ACTIVE (Saved) SID Lines */}
+        {activeAirportConfig && activeAirportConfig.sids && (
+          Object.entries(activeAirportConfig.sids).map(([runwayId, gateMap]) => {
+            return Object.entries(gateMap || {}).map(([gateId, waypointIds]) => {
+              const gateColor = GATE_COLORS[gateId.toUpperCase()] || '#888';
+              const positions = (waypointIds || [])
+                .map(id => activeAirportConfig.waypoints[id])
+                .filter(Boolean)
+                .map(wp => xyToLatLon(wp.x, wp.y, activeAirport));
+
+              return positions.length > 1 ? (
+                <Polyline
+                  key={`sid-line-${runwayId}-${gateId}`}
+                  positions={positions}
+                  color={gateColor}
+                  weight={2}
+                  opacity={0.4}
+                  dashArray="5, 10"
+                />
+              ) : null;
+            });
+          })
+        )}
+
         {/* Render CURRENT Route Draft Line (Flare!) */}
         {draftingMode === 'route' && starDraft.sequence.length > 0 && (
           <Polyline
@@ -324,6 +349,21 @@ export default function RadarMap({
               .map(wp => xyToLatLon(wp.x, wp.y, activeAirport))
             }
             color={GATE_COLORS[starDraft.gate.toUpperCase()] || '#007bff'}
+            weight={4}
+            opacity={0.6}
+            dashArray="10, 10"
+          />
+        )}
+
+        {/* Render CURRENT SID Draft Line (Flare!) */}
+        {draftingMode === 'sid_route' && sidDraft.sequence.length > 0 && (
+          <Polyline
+            positions={sidDraft.sequence
+              .map(id => activeAirportConfig.waypoints[id])
+              .filter(Boolean)
+              .map(wp => xyToLatLon(wp.x, wp.y, activeAirport))
+            }
+            color={GATE_COLORS[sidDraft.gate.toUpperCase()] || '#38a169'}
             weight={4}
             opacity={0.6}
             dashArray="10, 10"

@@ -26,17 +26,16 @@ The simulation uses a high-fidelity radar display with a **45 KM** radius worksp
 
 ## Navigation Commands
 
-### 1. Vector (Heading)
-Sets a new target heading for the aircraft.
-*   **Syntax**: `ATC VECTOR <CALLSIGN> <HEADING>`
-*   **Value**: Heading in degrees (0-359).
-*   **Example**: `ATC VECTOR UA123 270` (Turns aircraft to West)
 
 ### 2. Direct To
-Bypasses current route waypoints and flies directly to a specific fix.
-*   **Syntax**: `ATC DIRECT_TO <CALLSIGN> <WAYPOINT_NAME>`
-*   **Value**: Name of the waypoint (e.g., IAF-RWY_1).
-*   **Example**: `ATC DIRECT_TO UA123 POM`
+Bypasses current route waypoints and flies directly to a specific fix or enters a named procedure.
+*   **Syntax**: `ATC DIRECT <CALLSIGN> TO <WAYPOINT_OR_PROCEDURE>`
+*   **Value**: Name of a Waypoint (e.g., `POM`) or a Procedural Alias (e.g., `SUTRA_1A`).
+*   **Example**: `ATC DIRECT UA123 TO SUTRA_1A`
+*   **Note**: 
+    - **No Spaces**: Waypoint and Procedure names **must NOT contain spaces**. Use underscores (e.g., `POOMA_1A`) instead.
+    - If a **Procedure** (STAR or SID) is specified, the aircraft will immediately start flying that route from the first waypoint.
+    - If a **Waypoint** is part of the current active procedure, the aircraft flies there and then correctly resumes the rest of the route (skipping middle waypoints).
 
 ### 3. Hold
 Instructs the aircraft to enter a holding pattern at its current position.
@@ -44,7 +43,7 @@ Instructs the aircraft to enter a holding pattern at its current position.
 *   **Example**: `ATC HOLD UA123`
 
 ### 4. Resume
-Resumes standard STAR/Route navigation (cancels Vectors or Holds).
+Resumes standard STAR/Route navigation (cancels manual Altitude or Speed overrides and resumes waypoint-based steering).
 *   **Syntax**: `ATC RESUME <CALLSIGN>`
 *   **Example**: `ATC RESUME UA123`
 
@@ -55,23 +54,21 @@ Resumes standard STAR/Route navigation (cancels Vectors or Holds).
 ### 5. Altitude
 Changes the aircraft's target altitude.
 *   **Syntax**: `ATC ALTITUDE <CALLSIGN> <ALTITUDE>`
-*   **Value**: Altitude in feet.
+*   **Value**: Altitude in feet. Range: 100 - 45,000 ft.
 *   **Example**: `ATC ALTITUDE UA123 5000`
+*   **Note**: This creates a **Manual Override**. The aircraft will maintain this altitude even if its current STAR route prescribes something else. Use the **RESUME** command to return to procedural altitudes.
 
 ### 6. Speed
 Changes the aircraft's target airspeed.
 *   **Syntax**: `ATC SPEED <CALLSIGN> <SPEED>`
-*   **Value**: Speed in knots.
+*   **Value**: Speed in knots. Range: 140 - 450 kts.
 *   **Example**: `ATC SPEED UA123 210`
+*   **Note**: This creates a **Manual Override**. The aircraft will maintain this speed even if its current STAR route prescribes something else. Use the **RESUME** command to return to procedural speeds.
 
 ---
 
 ## Arrival Procedures
 
-### 7. Approach
-Immediate transition to Final Approach logic. Aircraft will steer towards the runway centerline.
-*   **Syntax**: `ATC APPROACH <CALLSIGN>`
-*   **Example**: `ATC APPROACH UA123`
 
 ### 8. Land (Queued)
 Clears aircraft for landing. **Aircraft will complete its current STAR route** and automatically trigger the approach logic once it reaches the **IAF**.

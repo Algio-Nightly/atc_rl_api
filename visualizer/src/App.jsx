@@ -5,6 +5,7 @@ import FlightRoster from './components/FlightRoster';
 import DevConsole from './components/DevConsole';
 import FlightModal from './components/FlightModal';
 import AdminPanel from './components/AdminPanel';
+import RouteSidebar from './components/RouteSidebar';
 import './App.css';
 
 const INITIAL_STATE = {
@@ -37,9 +38,16 @@ function App() {
   
   // STAR Builder specific state
   const [starDraft, setStarDraft] = useState({
+    name: '',
     gate: 'N',
     runway_id: null,
     sequence: [] // List of Waypoint IDs
+  });
+  const [sidDraft, setSidDraft] = useState({
+    name: '',
+    runway_id: null,
+    gate: 'N',
+    sequence: []
   });
   const wsRef = useRef(null);
 
@@ -176,6 +184,8 @@ function App() {
 
         starDraft={starDraft}
         setStarDraft={setStarDraft}
+        sidDraft={sidDraft}
+        setSidDraft={setSidDraft}
       />
 
       <RadarMap
@@ -212,13 +222,20 @@ function App() {
         setHoveredWaypoint={setHoveredWaypoint}
       />
 
-      <FlightRoster
-        gameState={data}
-        flights={flightsList}
-        onSelectFlight={handleFlightSelect}
-        sendWSMessage={sendWSMessage}
-        hoveredWaypoint={hoveredWaypoint}
-      />
+      <div className="sidebar-panel">
+        <div className="sidebar-roster-section">
+          <FlightRoster
+            gameState={data}
+            flights={flightsList}
+            onSelectFlight={handleFlightSelect}
+            sendWSMessage={sendWSMessage}
+            hoveredWaypoint={hoveredWaypoint}
+          />
+        </div>
+        <div className="sidebar-routes-section">
+          <RouteSidebar gameState={data} />
+        </div>
+      </div>
 
       <DevConsole actions={logs} onSendCommand={handleSendCommand} />
 

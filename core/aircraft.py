@@ -14,7 +14,8 @@ class Aircraft:
                  state: str = "ENROUTE",
                  fuel_level: float = 100.0,
                  emergency_index: int = 0,
-                 active_star: str = None):
+                 active_star: str = None,
+                 gate: str = None):
         self.callsign = callsign
         self.type = type
         self.weight_class = weight_class
@@ -34,6 +35,7 @@ class Aircraft:
         self.emergency_index = emergency_index
         
         # STAR navigation
+        self.gate = gate
         self.active_star = active_star
         self.wp_index = 0
         self.direct_to_wp = None # WaypointConfig if active
@@ -51,7 +53,7 @@ class Aircraft:
         
         # Physics constraints
         self.turn_rate = 3.0       # Degrees per second
-        self.accel_rate = 4.0      # Knots per second (Boosted for takeoff on standard runways)
+        self.accel_rate = 3.0      # Knots per second (Boosted for takeoff on standard runways)
         self.alt_rate = 25.0       # Feet per second (~1500 fpm)
         self.fuel_burn_rate = 0.01 # Fuel % per second
 
@@ -63,6 +65,10 @@ class Aircraft:
         
         # Queued Landing State (Delayed Landing)
         self.queued_landing = None # {runway_id, threshold, heading}
+
+        # Manual Overrides (Persistent until Resume or Approach)
+        self.manual_target_alt = None
+        self.manual_target_speed = None
 
     def update(self, dt: float, engine_context: dict = None):
         """Update physics kinematics for the given time step dt"""
@@ -141,9 +147,15 @@ class Aircraft:
                 self.target_heading = (90 - math.degrees(math.atan2(dy, dx))) % 360
                 self.target_alt = self.direct_to_wp["target_alt"]
                 self.target_speed = self.direct_to_wp["target_speed"]
-                if math.sqrt(dx**2 + dy**2) < 1.5: self.direct_to_wp = None 
+                if math.sqrt(dx**2 + dy**2) < 1.5: 
+                    self.direct_to_wp = None
+                    # Restore state after reaching direct-to point
+                    if self.active_star: self.state = "ENROUTE"
+                    elif self.takeoff_timer <= 0: self.state = "CLIMB_OUT"
 
             elif self.state == "APPROACH" and self.runway_threshold:
+                # Clear manual overrides when entering approach logic
+                self.manual_target_alt = self.manual_target_speed = None
                 dx, dy = self.runway_threshold["x"] - self.x, self.runway_threshold["y"] - self.y
                 dist = math.sqrt(dx**2 + dy**2)
                 if self.landing_start_dist == 0: self.landing_start_dist = dist
@@ -167,6 +179,8 @@ class Aircraft:
                             self.state = "CRASHED_RUNWAY_INCURSION"
 
             elif self.state == "LANDING":
+                # Clear manual overrides when entering landing logic
+                self.manual_target_alt = self.manual_target_speed = None
                 self.target_speed = 0
                 self.target_alt = 0
                 self.target_heading = self.runway_heading
@@ -179,7 +193,11 @@ class Aircraft:
                 
                 if self.wp_index < len(selected_route):
                     wp = selected_route[self.wp_index]
-                    self.target_alt, self.target_speed = wp["target_alt"], wp["target_speed"]
+                    
+                    # Prioritize manual overrides over route data
+                    self.target_alt = self.manual_target_alt if self.manual_target_alt is not None else wp["target_alt"]
+                    self.target_speed = self.manual_target_speed if self.manual_target_speed is not None else wp["target_speed"]
+                    
                     dx, dy = wp["x"] - self.x, wp["y"] - self.y
                     self.target_heading = (90 - math.degrees(math.atan2(dy, dx))) % 360
                     
@@ -264,6 +282,7 @@ class Aircraft:
             "state": self.state,
             "fuel_level": round(self.fuel_level, 1),
             "emergency_index": self.emergency_index,
+            "gate": self.gate,
             "active_star": self.active_star,
             "wp_index": self.wp_index,
             "is_holding": self.state == "HOLDING"

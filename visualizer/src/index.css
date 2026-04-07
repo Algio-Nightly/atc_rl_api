@@ -70,10 +70,24 @@ body {
   grid-row: 1 / 3;
   border: 1px solid #dee2e6;
   background: #ffffff;
-  padding: 20px;
-  overflow-y: auto;
+  padding: 0;
+  overflow: hidden;
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-roster-section {
+  flex: 1;
+  overflow-y: auto;
+  border-bottom: 1px solid #eee;
+}
+
+.sidebar-routes-section {
+  flex: 1;
+  overflow-y: auto;
+  background: #fcfcfc;
 }
 
 .console-panel {

@@ -14,7 +14,9 @@ export default function AdminPanel({
   isRunwayBidirectional,
   setIsRunwayBidirectional,
   starDraft,
-  setStarDraft
+  setStarDraft,
+  sidDraft,
+  setSidDraft
 }) {
   const [editingWaypoint, setEditingWaypoint] = useState(null); // {gate, runway, index, wp}
   const [editingRunway, setEditingRunway] = useState(null); // {rw}
@@ -291,11 +293,16 @@ export default function AdminPanel({
           </div>
         )}
       </div>
-
-      {/* STAR Route Builder */}
+      {/* Arrival Route Builder (STAR) */}
       <div className="section" style={{ borderTop: '1px solid #f0f0f0', paddingTop: '12px', marginTop: '12px' }}>
         <h4 style={{ margin: '0 0 8px 0', fontSize: '0.7rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Arrival Routes</h4>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <input
+            placeholder="Procedure Name (e.g. SUTRA 1A)"
+            value={starDraft.name || ''}
+            onChange={e => setStarDraft({ ...starDraft, name: e.target.value })}
+            style={{ padding: '4px', fontSize: '0.65rem', border: '1px solid #eee', borderRadius: '4px' }}
+          />
           <div style={{ display: 'flex', gap: '4px' }}>
             <select
               value={starDraft.gate}
@@ -323,7 +330,7 @@ export default function AdminPanel({
             style={{ width: '100%', background: draftingMode === 'route' ? '#ffcccc' : '#f8f9fa', fontSize: '0.65rem' }}
             onClick={() => setDraftingMode(draftingMode === 'route' ? null : 'route')}
           >
-            {draftingMode === 'route' ? 'Building...' : 'Build Route'}
+            {draftingMode === 'route' ? 'Building STAR...' : 'Build STAR'}
           </button>
 
           {draftingMode === 'route' && (
@@ -350,16 +357,98 @@ export default function AdminPanel({
                   onClick={() => {
                     sendWSMessage('save_star_route', {
                       airport_code: activeAirport.airport_code,
+                      name: starDraft.name || `Route_${starDraft.gate}_${starDraft.runway_id}`,
                       gate: starDraft.gate,
                       runway_id: starDraft.runway_id,
                       sequence: starDraft.sequence
                     });
                     setDraftingMode(null);
-                    setStarDraft(prev => ({ ...prev, sequence: [] }));
+                    setStarDraft(prev => ({ ...prev, sequence: [], name: '' }));
                   }}
                   className="btn btn-primary"
                   style={{ flex: 1, background: '#007bff', fontSize: '0.6rem', padding: '2px' }}
-                >Save</button>
+                >Save STAR</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* SID Route Builder */}
+      <div className="section" style={{ borderTop: '1px solid #f0f0f0', paddingTop: '12px', marginTop: '12px' }}>
+        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.7rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Departure Routes</h4>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <input
+            placeholder="Procedure Name (e.g. RWY1 EXIT)"
+            value={sidDraft.name || ''}
+            onChange={e => setSidDraft({ ...sidDraft, name: e.target.value })}
+            style={{ padding: '4px', fontSize: '0.65rem', border: '1px solid #eee', borderRadius: '4px' }}
+          />
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <select
+              value={sidDraft.runway_id || ''}
+              onChange={e => setSidDraft({ ...sidDraft, runway_id: e.target.value })}
+              style={{ flex: 1, padding: '2px', fontSize: '0.65rem', border: '1px solid #eee' }}
+            >
+              <option value="">RWY...</option>
+              {activeAirport?.runways?.map(rw => <option key={rw.id} value={rw.id}>{rw.id}</option>)}
+            </select>
+            <select
+              value={sidDraft.gate}
+              onChange={e => setSidDraft({ ...sidDraft, gate: e.target.value })}
+              style={{ flex: 1, padding: '2px', fontSize: '0.65rem', border: '1px solid #eee' }}
+            >
+              {activeAirportConfig?.gates ? 
+                Object.keys(activeAirportConfig.gates).map(g => <option key={g} value={g}>{g}</option>) :
+                <><option value="N">N</option><option value="S">S</option><option value="E">E</option><option value="W">W</option></>
+              }
+            </select>
+          </div>
+
+          <button
+            className="btn"
+            disabled={!sidDraft.runway_id}
+            style={{ width: '100%', background: draftingMode === 'sid_route' ? '#ffcccc' : '#f8f9fa', fontSize: '0.65rem' }}
+            onClick={() => setDraftingMode(draftingMode === 'sid_route' ? null : 'sid_route')}
+          >
+            {draftingMode === 'sid_route' ? 'Building SID...' : 'Build SID'}
+          </button>
+
+          {draftingMode === 'sid_route' && (
+            <div style={{ padding: '6px', background: '#e6ffed', border: '1px solid #baf0cc', borderRadius: '4px', marginTop: '4px' }}>
+              <select 
+                value="" 
+                onChange={(e) => setSidDraft(prev => ({ ...prev, sequence: [...prev.sequence, e.target.value] }))} 
+                style={{ width: '100%', padding: '2px', fontSize: '0.65rem', marginBottom: '6px' }}
+              >
+                <option value="">Add Waypoint...</option>
+                {Object.values(activeAirportConfig?.waypoints || {})
+                  .sort((a,b) => a.name.localeCompare(b.name))
+                  .map(wp => <option key={wp.id} value={wp.id}>{wp.name}</option>)}
+              </select>
+              
+              <div style={{ fontSize: '0.6rem', marginBottom: '6px', color: '#666', maxHeight: '40px', overflowY: 'auto' }}>
+                {sidDraft.sequence.map(id => activeAirportConfig.waypoints[id]?.name || id).join(' → ')}
+              </div>
+
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button onClick={() => setSidDraft({ ...sidDraft, sequence: [] })} className="btn" style={{ flex: 1, fontSize: '0.6rem', padding: '2px' }}>Clear</button>
+                <button 
+                  disabled={sidDraft.sequence.length === 0}
+                  onClick={() => {
+                    sendWSMessage('save_sid_route', {
+                      airport_code: activeAirport.airport_code,
+                      name: sidDraft.name || `Route_${sidDraft.runway_id}_${sidDraft.gate}`,
+                      runway_id: sidDraft.runway_id,
+                      gate: sidDraft.gate,
+                      sequence: sidDraft.sequence
+                    });
+                    setDraftingMode(null);
+                    setSidDraft(prev => ({ ...prev, sequence: [], name: '' }));
+                  }}
+                  className="btn btn-primary"
+                  style={{ flex: 1, background: '#28a745', fontSize: '0.6rem', padding: '2px' }}
+                >Save SID</button>
               </div>
             </div>
           )}

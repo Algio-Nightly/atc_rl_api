@@ -10,12 +10,10 @@ class CommandType(str, Enum):
     SIMULATION = "CMD"
 
 class ATCCommandID(str, Enum):
-    ATC_VECTOR = "ATC_VECTOR"
     ATC_ALTITUDE = "ATC_ALTITUDE"
     ATC_SPEED = "ATC_SPEED"
     ATC_DIRECT_TO = "ATC_DIRECT_TO"
     ATC_HOLD = "ATC_HOLD"
-    ATC_APPROACH = "ATC_APPROACH"
     ATC_LAND = "ATC_LAND"
     ATC_LINE_UP = "ATC_LINE_UP"
     ATC_TAKEOFF = "ATC_TAKEOFF"
@@ -50,6 +48,7 @@ class AircraftState(BaseModel):
     emergency_index: int = Field(default=0, ge=0, le=3, description="0=Normal, 1=Low Fuel, 3=Critical")
     
     # Routing
+    gate: Optional[str] = None
     active_star: Optional[str] = None
     wp_index: int = 0
     is_holding: bool = False
@@ -149,6 +148,11 @@ class AirportConfig(BaseModel):
     stars: Dict[str, Dict[str, List[str]]] = {}
     # runway -> gate -> waypoint_ids
     sids: Dict[str, Dict[str, List[str]]] = {}
+    
+    # Theme/Procedural Names: "GATE:RUNWAY" -> "Name"
+    star_names: Dict[str, str] = {}
+    sid_names: Dict[str, str] = {}
+    
     time_scale: float = 1.0
 
 # --- Request Models ---
@@ -173,6 +177,28 @@ class StarRouteSaveRequest(BaseModel):
     gate_id: str
     runway_id: str
     route_sequence: List[str] # List of waypoint IDs
+    name: Optional[str] = None
+
+    @field_validator("name")
+    @classmethod
+    def sanitize_name(cls, v: Optional[str]):
+        if v:
+            return v.replace(" ", "_")
+        return v
+
+class SidRouteSaveRequest(BaseModel):
+    airport_code: str
+    runway_id: str
+    gate_id: str
+    route_sequence: List[str]
+    name: Optional[str] = None
+
+    @field_validator("name")
+    @classmethod
+    def sanitize_name(cls, v: Optional[str]):
+        if v:
+            return v.replace(" ", "_")
+        return v
 
 class WaypointUpdateRequest(BaseModel):
     airport_code: str

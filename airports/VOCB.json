@@ -54,6 +54,7 @@
       "id": "RWY_1",
       "heading": 45.635345751497525,
       "length_km": 2.965217254851096,
+      "altitude": 0,
       "start": {
         "x": -0.4704499936863352,
         "y": -0.8679408896767965
@@ -75,6 +76,7 @@
       "id": "RWY_1_REV",
       "heading": 225.63534575149754,
       "length_km": 2.965217254851096,
+      "altitude": 0,
       "start": {
         "x": 1.6493961742692762,
         "y": 1.2054055822546506
@@ -143,7 +145,7 @@
       "name": "WP_5",
       "x": -32.361666076089456,
       "y": -11.977717652592183,
-      "target_alt": 3000,
+      "target_alt": 5000,
       "target_speed": 210,
       "is_iaf": false,
       "is_faf": false,
@@ -258,6 +260,20 @@
         "IAF_RWY_1",
         "FAF_RWY_1"
       ]
+    },
+    "S": {
+      "RWY_1": [
+        "2dede030-03c4-4a42-93d3-e39249f114bb",
+        "IAF_RWY_1",
+        "FAF_RWY_1"
+      ],
+      "RWY_1_REV": [
+        "81c04ec3-9844-4d10-8e76-ab11e7581af5",
+        "8c3c2eb5-1555-4764-919f-1c4702240521",
+        "3c679d2b-23b9-425d-a2a5-97a7eaf70783",
+        "IAF_RWY_1_REV",
+        "FAF_RWY_1_REV"
+      ]
     }
   },
   "sids": {
@@ -297,6 +313,23 @@
         "W"
       ]
     }
+  },
+  "star_names": {
+    "N:RWY_1": "POOMA_1A",
+    "W:RWY_1": "SUTRA_2B",
+    "N:RWY_1_REV": "VOR_19",
+    "S:RWY_1_REV": "Route_S_RWY_1_REV",
+    "S:RWY_1": "Route_S_RWY1"
+  },
+  "sid_names": {
+    "RWY_1:N": "POOMA_1D",
+    "RWY_1:S": "SUTRA_2D",
+    "RWY_1:E": "Route_RWY1_E",
+    "RWY_1:W": "Route_RWY1_W",
+    "RWY_1_REV:N": "VOR_19D",
+    "RWY_1_REV:S": "Route_RWY1REV_S",
+    "RWY_1_REV:E": "Route_RWY1REV_E",
+    "RWY_1_REV:W": "Route_RWY1REV_W"
   },
   "time_scale": 8.0
 }

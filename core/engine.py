@@ -236,7 +236,7 @@ class SimulationEngine:
             dy = 0 - pos[1]
             heading = (90 - math.degrees(math.atan2(dy, dx))) % 360
 
-        new_ac = Aircraft(callsign.upper(), ac_type, weight_class, pos, altitude, heading, speed, active_star=gate)
+        new_ac = Aircraft(callsign.upper(), ac_type, weight_class, pos, altitude, heading, speed, active_star=gate, gate=gate)
         self.aircrafts[callsign.upper()] = new_ac
         self.event_buffer.append({
             "type": "SPAWN", 
@@ -292,7 +292,8 @@ class SimulationEngine:
             altitude=0,
             heading=rw_cfg.heading,
             speed=0,
-            state=initial_state
+            state=initial_state,
+            gate=gate_id
         )
         
         # Initialize departure state
