@@ -1,0 +1,470 @@
+{
+  "airport_code": "ANTA",
+  "name": "ANTARCTICA",
+  "anchor": {
+    "lat": -80.68182534977655,
+    "lon": 67.59944577494565
+  },
+  "bounds": {
+    "width_km": 100.0,
+    "height_km": 100.0
+  },
+  "center": {
+    "x": 0.0,
+    "y": 0.0
+  },
+  "gates": {
+    "N": {
+      "x": 0.0,
+      "y": 45.0
+    },
+    "S": {
+      "x": 0.0,
+      "y": -45.0
+    },
+    "E": {
+      "x": 45.0,
+      "y": 0.0
+    },
+    "W": {
+      "x": -45.0,
+      "y": 0.0
+    }
+  },
+  "terminal_gates": {
+    "G1": {
+      "x": 0.2,
+      "y": 0.2
+    },
+    "G2": {
+      "x": -0.2,
+      "y": 0.2
+    },
+    "G3": {
+      "x": 0.2,
+      "y": -0.2
+    },
+    "G4": {
+      "x": -0.2,
+      "y": -0.2
+    }
+  },
+  "runways": [
+    {
+      "id": "RWY_1",
+      "heading": 83.21679549281036,
+      "length_km": 1.1732009616310903,
+      "altitude": 0,
+      "start": {
+        "x": -0.6326531666430049,
+        "y": -0.4213929586475217
+      },
+      "end": {
+        "x": 0.5323355923774783,
+        "y": -0.2828228041118865
+      },
+      "iaf": {
+        "x": -20.49265664636757,
+        "y": -2.7836507314843675
+      },
+      "dp": {
+        "x": 25.357339942033185,
+        "y": 2.6699994119341706
+      }
+    },
+    {
+      "id": "RWY_1_REV",
+      "heading": 263.2167954928104,
+      "length_km": 1.1732009616310903,
+      "altitude": 0,
+      "start": {
+        "x": 0.5323355923774783,
+        "y": -0.2828228041118865
+      },
+      "end": {
+        "x": -0.6326531666430049,
+        "y": -0.4213929586475217
+      },
+      "iaf": {
+        "x": 20.392339072102047,
+        "y": 2.0794349687249483
+      },
+      "dp": {
+        "x": -25.457657516298717,
+        "y": -3.374215174693565
+      }
+    },
+    {
+      "id": "RWY_3",
+      "heading": 352.07228041912174,
+      "length_km": 1.2557142254118518,
+      "altitude": 0,
+      "start": {
+        "x": -0.02281936862597217,
+        "y": -0.7269247829059486
+      },
+      "end": {
+        "x": -0.19601216642609526,
+        "y": 0.5167883957216048
+      },
+      "iaf": {
+        "x": 2.7356553590664534,
+        "y": -20.535781821530925
+      },
+      "dp": {
+        "x": -3.644105576041627,
+        "y": 25.27785969400282
+      }
+    },
+    {
+      "id": "RWY_3_REV",
+      "heading": 172.07228041912174,
+      "length_km": 1.2557142254118518,
+      "altitude": 0,
+      "start": {
+        "x": -0.19601216642609526,
+        "y": 0.5167883957216048
+      },
+      "end": {
+        "x": -0.02281936862597217,
+        "y": -0.7269247829059486
+      },
+      "iaf": {
+        "x": -2.9544868941185185,
+        "y": 20.32564543434658
+      },
+      "dp": {
+        "x": 3.425274040989557,
+        "y": -25.487996081187166
+      }
+    }
+  ],
+  "waypoints": {
+    "FAF_RWY_1": {
+      "id": "FAF_RWY_1",
+      "name": "FAF_RWY_1",
+      "x": -9.569654732519059,
+      "y": -1.4844089564241023,
+      "target_alt": 2000,
+      "target_speed": 180,
+      "is_iaf": false,
+      "is_faf": true,
+      "holding_stack": []
+    },
+    "IAF_RWY_1": {
+      "id": "IAF_RWY_1",
+      "name": "IAF_RWY_1",
+      "x": -20.49265664636757,
+      "y": -2.7836507314843675,
+      "target_alt": 4000,
+      "target_speed": 210,
+      "is_iaf": true,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "DP_RWY_1": {
+      "id": "DP_RWY_1",
+      "name": "DP",
+      "x": 25.357339942033185,
+      "y": 2.6699994119341706,
+      "target_alt": 6000,
+      "target_speed": 250,
+      "is_iaf": false,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "FAF_RWY_1_REV": {
+      "id": "FAF_RWY_1_REV",
+      "name": "FAF_RWY_1_REV",
+      "x": 9.469337158253534,
+      "y": 0.7801931936646891,
+      "target_alt": 2000,
+      "target_speed": 180,
+      "is_iaf": false,
+      "is_faf": true,
+      "holding_stack": []
+    },
+    "IAF_RWY_1_REV": {
+      "id": "IAF_RWY_1_REV",
+      "name": "IAF_RWY_1_REV",
+      "x": 20.392339072102047,
+      "y": 2.0794349687249483,
+      "target_alt": 4000,
+      "target_speed": 210,
+      "is_iaf": true,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "DP_RWY_1_REV": {
+      "id": "DP_RWY_1_REV",
+      "name": "DP",
+      "x": -25.457657516298717,
+      "y": -3.374215174693565,
+      "target_alt": 6000,
+      "target_speed": 250,
+      "is_iaf": false,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "FAF_RWY_3": {
+      "id": "FAF_RWY_3",
+      "name": "FAF_RWY_3",
+      "x": 1.2184942588356193,
+      "y": -9.640910450287187,
+      "target_alt": 2000,
+      "target_speed": 180,
+      "is_iaf": false,
+      "is_faf": true,
+      "holding_stack": []
+    },
+    "IAF_RWY_3": {
+      "id": "IAF_RWY_3",
+      "name": "IAF_RWY_3",
+      "x": 2.7356553590664534,
+      "y": -20.535781821530925,
+      "target_alt": 4000,
+      "target_speed": 210,
+      "is_iaf": true,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "DP_RWY_3": {
+      "id": "DP_RWY_3",
+      "name": "DP",
+      "x": -3.644105576041627,
+      "y": 25.27785969400282,
+      "target_alt": 6000,
+      "target_speed": 250,
+      "is_iaf": false,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "FAF_RWY_3_REV": {
+      "id": "FAF_RWY_3_REV",
+      "name": "FAF_RWY_3_REV",
+      "x": -1.4373257938876856,
+      "y": 9.430774063102843,
+      "target_alt": 2000,
+      "target_speed": 180,
+      "is_iaf": false,
+      "is_faf": true,
+      "holding_stack": []
+    },
+    "IAF_RWY_3_REV": {
+      "id": "IAF_RWY_3_REV",
+      "name": "IAF_RWY_3_REV",
+      "x": -2.9544868941185185,
+      "y": 20.32564543434658,
+      "target_alt": 4000,
+      "target_speed": 210,
+      "is_iaf": true,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "DP_RWY_3_REV": {
+      "id": "DP_RWY_3_REV",
+      "name": "DP",
+      "x": 3.425274040989557,
+      "y": -25.487996081187166,
+      "target_alt": 6000,
+      "target_speed": 250,
+      "is_iaf": false,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "893e3d7d-ca00-4a5c-81aa-80bf19810364": {
+      "id": "893e3d7d-ca00-4a5c-81aa-80bf19810364",
+      "name": "WP_13",
+      "x": -24.877727255062716,
+      "y": 17.757555081299543,
+      "target_alt": 3000,
+      "target_speed": 210,
+      "is_iaf": false,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "6ffe3888-1c15-486e-87d5-5902b7fd4f18": {
+      "id": "6ffe3888-1c15-486e-87d5-5902b7fd4f18",
+      "name": "WP_14",
+      "x": 18.469955851430342,
+      "y": 23.61371394164023,
+      "target_alt": 3000,
+      "target_speed": 210,
+      "is_iaf": false,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "b6b5f26d-5b1e-41c3-a3d9-d72a8d8e7f63": {
+      "id": "b6b5f26d-5b1e-41c3-a3d9-d72a8d8e7f63",
+      "name": "WP_15",
+      "x": -19.86520554669126,
+      "y": -23.819926470308623,
+      "target_alt": 3000,
+      "target_speed": 210,
+      "is_iaf": false,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "68fdedb7-e128-45ae-831c-2e7dc7b42e3c": {
+      "id": "68fdedb7-e128-45ae-831c-2e7dc7b42e3c",
+      "name": "WP_16",
+      "x": 23.680412185858163,
+      "y": -19.16498747021101,
+      "target_alt": 3000,
+      "target_speed": 210,
+      "is_iaf": false,
+      "is_faf": false,
+      "holding_stack": []
+    }
+  },
+  "stars": {
+    "N": {
+      "RWY_1": [
+        "893e3d7d-ca00-4a5c-81aa-80bf19810364",
+        "IAF_RWY_1",
+        "FAF_RWY_1"
+      ],
+      "RWY_1_REV": [
+        "IAF_RWY_1_REV",
+        "FAF_RWY_1_REV"
+      ],
+      "RWY_3": [
+        "IAF_RWY_3",
+        "FAF_RWY_3"
+      ],
+      "RWY_3_REV": [
+        "IAF_RWY_3_REV",
+        "FAF_RWY_3_REV"
+      ]
+    },
+    "S": {
+      "RWY_1": [
+        "IAF_RWY_1",
+        "FAF_RWY_1"
+      ],
+      "RWY_1_REV": [
+        "IAF_RWY_1_REV",
+        "FAF_RWY_1_REV"
+      ],
+      "RWY_3": [
+        "IAF_RWY_3",
+        "FAF_RWY_3"
+      ],
+      "RWY_3_REV": [
+        "IAF_RWY_3_REV",
+        "FAF_RWY_3_REV"
+      ]
+    },
+    "E": {
+      "RWY_1": [
+        "IAF_RWY_1",
+        "FAF_RWY_1"
+      ],
+      "RWY_1_REV": [
+        "IAF_RWY_1_REV",
+        "FAF_RWY_1_REV"
+      ],
+      "RWY_3": [
+        "IAF_RWY_3",
+        "FAF_RWY_3"
+      ],
+      "RWY_3_REV": [
+        "IAF_RWY_3_REV",
+        "FAF_RWY_3_REV"
+      ]
+    },
+    "W": {
+      "RWY_1": [
+        "IAF_RWY_1",
+        "FAF_RWY_1"
+      ],
+      "RWY_1_REV": [
+        "IAF_RWY_1_REV",
+        "FAF_RWY_1_REV"
+      ],
+      "RWY_3": [
+        "IAF_RWY_3",
+        "FAF_RWY_3"
+      ],
+      "RWY_3_REV": [
+        "IAF_RWY_3_REV",
+        "FAF_RWY_3_REV"
+      ]
+    }
+  },
+  "sids": {
+    "RWY_1": {
+      "N": [
+        "DP_RWY_1",
+        "N"
+      ],
+      "S": [
+        "DP_RWY_1",
+        "S"
+      ],
+      "E": [
+        "DP_RWY_1",
+        "E"
+      ],
+      "W": [
+        "DP_RWY_1",
+        "W"
+      ]
+    },
+    "RWY_1_REV": {
+      "N": [
+        "DP_RWY_1_REV",
+        "N"
+      ],
+      "S": [
+        "DP_RWY_1_REV",
+        "S"
+      ],
+      "E": [
+        "DP_RWY_1_REV",
+        "E"
+      ],
+      "W": [
+        "DP_RWY_1_REV",
+        "W"
+      ]
+    },
+    "RWY_3": {
+      "N": [
+        "DP_RWY_3",
+        "N"
+      ],
+      "S": [
+        "DP_RWY_3",
+        "S"
+      ],
+      "E": [
+        "DP_RWY_3",
+        "E"
+      ],
+      "W": [
+        "DP_RWY_3",
+        "W"
+      ]
+    },
+    "RWY_3_REV": {
+      "N": [
+        "DP_RWY_3_REV",
+        "N"
+      ],
+      "S": [
+        "DP_RWY_3_REV",
+        "S"
+      ],
+      "E": [
+        "DP_RWY_3_REV",
+        "E"
+      ],
+      "W": [
+        "DP_RWY_3_REV",
+        "W"
+      ]
+    }
+  },
+  "time_scale": 8.0
+}

@@ -181,5 +181,5 @@ class ATCEnv(Environment):
         return obs
 
     def compute_reward(self):
-        """Reward function: +1 for distance to runway, -100 for collision"""
+        """Reward function"""
         return 0.0

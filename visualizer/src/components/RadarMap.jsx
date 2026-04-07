@@ -4,13 +4,19 @@ import L from 'leaflet';
 import { xyToLatLon, latLonToXY, MAP_CENTER } from '../utils/geo';
 import 'leaflet/dist/leaflet.css';
 
+const planeIconCache = {};
+
 // SVG icon to represent a plane pointing UP (0 degrees = North)
 const createPlaneIcon = (heading, isSelected, scale = 1) => {
+  const roundedHeading = Math.round(heading);
+  const key = `${roundedHeading}-${isSelected}-${scale}`;
+  if (planeIconCache[key]) return planeIconCache[key];
+
   const size = 24 * scale;
-  return L.divIcon({
+  const icon = L.divIcon({
     className: 'custom-plane-icon',
     html: `
-      <div style="transform: rotate(${heading}deg); transition: transform 0.3s; display: flex; justify-content: center; align-items: center; width: ${size}px; height: ${size}px; background: transparent;">
+      <div style="transform: rotate(${roundedHeading}deg); transition: transform 0.3s; display: flex; justify-content: center; align-items: center; width: ${size}px; height: ${size}px; background: transparent;">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}" fill="${isSelected ? '#007bff' : '#333'}">
           <path d="M12 2 L14 10 L22 14 L22 16 L14 14 L13 20 L15 22 L15 24 L12 23 L9 24 L9 22 L11 20 L10 14 L2 16 L2 14 L10 10 Z"/>
         </svg>
@@ -19,6 +25,9 @@ const createPlaneIcon = (heading, isSelected, scale = 1) => {
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2]
   });
+  
+  planeIconCache[key] = icon;
+  return icon;
 };
 
 const GATE_COLORS = {
@@ -32,20 +41,25 @@ const GATE_COLORS = {
   "WEST": "#FBBC05"
 };
 
+const waypointIconCache = {};
+
 const createWaypointIcon = (label, color, scale = 1, isIAF = false, isFAF = false) => {
+  const key = `${label}-${color}-${scale}-${isIAF}-${isFAF}`;
+  if (waypointIconCache[key]) return waypointIconCache[key];
+
   const visualSize = (isIAF || isFAF ? 42 : 36) * scale;
-  const hitAreaSize = visualSize * 4.0;
+  const hitAreaSize = visualSize * 1.2;
   const borderRadius = isIAF ? '2px' : (isFAF ? '50%' : '50%');
   const transform = isIAF ? 'rotate(45deg)' : 'none';
   const labelTransform = isIAF ? 'rotate(-45deg)' : 'none';
-  
+
   // Custom styling for FAF
   const fafColor = '#FF8C00'; // DarkOrange
   const finalColor = isFAF ? fafColor : color;
   const border = isFAF ? '3px solid #fff' : '2px solid white';
   const boxShadow = isFAF ? '0 0 15px rgba(255, 140, 0, 0.8)' : '0 4px 10px rgba(0,0,0,0.5)';
 
-  return L.divIcon({
+  const icon = L.divIcon({
     className: 'custom-waypoint-icon',
     html: `
       <div style="
@@ -83,6 +97,9 @@ const createWaypointIcon = (label, color, scale = 1, isIAF = false, isFAF = fals
     iconSize: [hitAreaSize, hitAreaSize],
     iconAnchor: [hitAreaSize / 2, hitAreaSize / 2]
   });
+
+  waypointIconCache[key] = icon;
+  return icon;
 };
 
 export default function RadarMap({
@@ -116,6 +133,7 @@ export default function RadarMap({
   const [clickedInfo, setClickedInfo] = React.useState(null);
   const [toastKey, setToastKey] = React.useState(0);
   const [currentZoom, setCurrentZoom] = React.useState(13);
+  const hoverTimer = React.useRef(null);
 
   React.useEffect(() => {
     if (clickedInfo) {
@@ -208,15 +226,15 @@ export default function RadarMap({
             key={`ring-${r}`}
             center={[activeAirport.lat, activeAirport.lon]}
             radius={r}
-            pathOptions={{ 
-              color: r === 45000 ? '#007bff' : '#ccc', 
-              weight: r === 45000 ? 2 : 1, 
-              dashArray: '10, 10', 
-              fillOpacity: r === 45000 ? 0.02 : 0 
+            pathOptions={{
+              color: r === 45000 ? '#007bff' : '#ccc',
+              weight: r === 45000 ? 2 : 1,
+              dashArray: '10, 10',
+              fillOpacity: r === 45000 ? 0.02 : 0
             }}
           >
-             <Tooltip permanent direction="top" opacity={0.5}>
-              <span style={{ fontSize: '0.6rem', color: '#999' }}>{r/1000} KM</span>
+            <Tooltip permanent direction="top" opacity={0.5}>
+              <span style={{ fontSize: '0.6rem', color: '#999' }}>{r / 1000} KM</span>
             </Tooltip>
           </Circle>
         ))}
@@ -257,7 +275,7 @@ export default function RadarMap({
             const isIAF = wp.is_iaf || wp.name?.includes("IAF");
             const isFAF = wp.is_faf || wp.name?.includes("FAF");
             const isDP = wp.name?.includes("DP");
-            
+
             // Color logic: Departure (Greenish), IAF (Purple), FAF (Orange/Gray)
             const color = isIAF ? "#4B0082" : (isDP ? "#28a745" : "#555");
             const label = isIAF ? "IAF" : (isFAF ? "FAF" : (isDP ? "DP" : "WP"));
@@ -277,8 +295,14 @@ export default function RadarMap({
                       setSidDraft(prev => ({ ...prev, sequence: [...prev.sequence, wp.id] }));
                     }
                   },
-                  mouseover: () => setHoveredWaypoint(wp),
-                  mouseout: () => setHoveredWaypoint(null)
+                  mouseover: () => {
+                    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+                    hoverTimer.current = setTimeout(() => setHoveredWaypoint(wp), 150);
+                  },
+                  mouseout: () => {
+                    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+                    setHoveredWaypoint(null);
+                  }
                 }}
               >
                 <Tooltip direction="top" offset={[0, -10]}>
