@@ -117,16 +117,11 @@ class SimulationEngine:
                 if gate_routes:
                     stars[gate_id] = gate_routes
         
-        # Build sids context (already in config.sids but can be processed here if needed)
-        sids = self.config.sids if self.config else {}
-
         context = {
             "wind_heading": self.wind_heading,
             "wind_speed": self.wind_speed,
             "stars": stars,
-            "sids": self.config.sids if self.config else {},
             "runway_status": self.runway_status,
-            "all_waypoints": self.config.waypoints if self.config else {}
         }
         
         to_delete = []
@@ -155,23 +150,45 @@ class SimulationEngine:
                     to_delete.append(callsign)
             
             if aircraft.state == "CRASHED" or aircraft.state == "CRASHED_RUNWAY_INCURSION":
-                self.is_terminal = True
-                self.event_buffer.append({
-                    "type": "CRASH", 
-                    "subtype": aircraft.state,
-                    "callsign": callsign, 
-                    "timestamp": time.time()
-                })
+                self.trigger_crash(callsign, aircraft.state)
                 # Release lock if they crash while on runway
                 if aircraft.target_runway_id in self.runway_status:
                     if self.runway_status[aircraft.target_runway_id]["occupied_by"] == callsign:
                         self.runway_status[aircraft.target_runway_id]["occupied_by"] = None
+
+            # 1. CFIT Detection (Controlled Flight Into Terrain)
+            # Below 50ft when not in a ground/landing state
+            if aircraft.altitude < 50 and aircraft.state not in ["ON_GATE", "TAXIING", "HOLDING_SHORT", "LINE_UP", "TAKEOFF_ROLL", "LANDING"]:
+                self.trigger_crash(callsign, "CFIT")
+
+            # 2. Runway Overshoot (Overrun) Detection
+            # If in LANDING state and past the runway boundary at high speed
+            if aircraft.state == "LANDING" and aircraft.target_runway_id:
+                rw_cfg = next((r for r in self.config.runways if r.id == aircraft.target_runway_id), None)
+                if rw_cfg:
+                    # Check distance from threshold vs runway length
+                    dist_from_threshold = math.sqrt((aircraft.x - rw_cfg.start.x)**2 + (aircraft.y - rw_cfg.start.y)**2)
+                    if dist_from_threshold > (rw_cfg.length_km + 0.1) and aircraft.speed > 20:
+                        self.trigger_crash(callsign, "OVERRUN")
 
         for callsign in to_delete:
             if callsign in self.aircrafts:
                 del self.aircrafts[callsign]
 
         self.check_separation_violations()
+
+    def trigger_crash(self, callsign: str, subtype: str, participants: list[str] = None):
+        """Centralized crash handler"""
+        if self.is_terminal: return
+        self.is_terminal = True
+        self.event_buffer.append({
+            "type": "CRASH", 
+            "subtype": subtype,
+            "callsign": callsign, 
+            "participants": participants or [callsign],
+            "timestamp": time.time(),
+            "msg": f"CRASH: {subtype} involving {', '.join(participants or [callsign])}"
+        })
 
     def check_separation_violations(self):
         callsigns = list(self.aircrafts.keys())
@@ -181,11 +198,16 @@ class SimulationEngine:
                 a2 = self.aircrafts[callsigns[j]]
                 dist = math.sqrt((a1.x - a2.x)**2 + (a1.y - a2.y)**2)
                 alt_diff = abs(a1.altitude - a2.altitude)
-                # Hardcoded separation mins for now (5km/1000ft)
-                if dist < 0.5 and alt_diff < 500:
-                    self.is_terminal = True
-                    self.event_buffer.append({"type": "COLLISION", "participants": [a1.callsign, a2.callsign], "timestamp": time.time()})
+                
+                # COLLISION (MAC): < 0.3km (300m) AND < 300ft
+                if dist < 0.3 and alt_diff < 300:
+                    self.trigger_crash(a1.callsign, "MAC", [a1.callsign, a2.callsign])
+                
+                # SEPARATION VIOLATION: < 5km AND < 1000ft
                 elif dist < 5.0 and alt_diff < 1000:
+                    # Skip violation if they are on ground close to each other
+                    if a1.altitude < 100 and a2.altitude < 100:
+                        continue
                     self.event_buffer.append({"type": "SEPARATION_VIOLATION", "participants": [a1.callsign, a2.callsign], "timestamp": time.time()})
 
     def reset_environment(self):
