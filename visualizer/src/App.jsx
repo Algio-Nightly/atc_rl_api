@@ -156,6 +156,7 @@ function App() {
   return (
     <div className="dashboard-container">
       <AdminPanel
+        gameState={data}
         airports={data.airports || []}
         activeAirport={activeAirport}
         activeAirportConfig={data.config}

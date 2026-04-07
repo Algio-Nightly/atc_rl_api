@@ -291,20 +291,30 @@ async def websocket_endpoint(websocket: WebSocket):
                 
                 elif msg_type == "spawn":
                     import random
+                    is_departure = str(payload.get("is_departure", "false")).lower() == "true"
                     gate = payload.get("gate", "N")
                     callsign = payload.get("callsign", f"SQ{random.randint(100, 999)}").upper()
                     ac_type = payload.get("type", "B738")
-                    altitude = payload.get("altitude", 10000)
-                    speed = payload.get("speed", 250)
                     
-                    engine.add_aircraft(
-                        callsign=callsign,
-                        ac_type=ac_type,
-                        weight_class="Medium",
-                        gate=gate,
-                        altitude=altitude,
-                        speed=speed
-                    )
+                    if is_departure:
+                        rw_id = payload.get("runway_id")
+                        if not rw_id:
+                            rw_id = engine.active_runways[0] if engine.active_runways else "RWY_1"
+                        term_gate = payload.get("terminal_gate_id")
+                        print(f"[API] Spawning DEPARTURE: {callsign} on {rw_id} via {gate} (Terminal Gate: {term_gate or 'Default'})")
+                        engine.spawn_departure(callsign, ac_type, rw_id, gate, term_gate)
+                    else:
+                        print(f"[API] Spawning ARRIVAL: {callsign} via {gate}")
+                        altitude = payload.get("altitude", 10000)
+                        speed = payload.get("speed", 250)
+                        engine.add_aircraft(
+                            callsign=callsign,
+                            ac_type=ac_type,
+                            weight_class="Medium",
+                            gate=gate,
+                            altitude=altitude,
+                            speed=speed
+                        )
                 
                 elif msg_type == "update_weather":
                     from atc_rl_api.api.schemas import WeatherUpdateRequest
@@ -343,6 +353,10 @@ async def websocket_endpoint(websocket: WebSocket):
                                         req_data["waypoint_name"] = value.upper()
                                 elif cmd_id == "ATC_LAND" and value:
                                     req_data["runway_id"] = value.upper()
+                                elif cmd_id == "ATC_LINE_UP":
+                                    pass # Logic in process_command
+                                elif cmd_id == "ATC_TAKEOFF":
+                                    pass # Logic in process_command
                                 
                                 result = await process_command(CommandRequest(**req_data))
                                 if "error" in result:
@@ -498,9 +512,16 @@ async def process_command(request: CommandRequest):
             else:
                 return {"error": f"Waypoint '{request.waypoint_name}' not found in airport pool", "code": 404}
     elif cmd == "ATC_APPROACH":
+        # Validation: Check if runway is busy
+        rw_id = request.runway_id or (engine.active_runways[0] if engine.active_runways else None)
+        if rw_id:
+            status_obj = engine.get_full_state()["runway_status"].get(rw_id.upper())
+            if status_obj and status_obj["status"] != "CLEAR" and status_obj["reserved_by"] != request.callsign:
+                return {"error": f"Runway {rw_id} is currently {status_obj['status']} ({status_obj.get('occupied_by') or status_obj.get('reserved_by') or 'Cooldown'})", "code": 409}
+
         aircraft.state = "APPROACH"
         aircraft.active_star = None
-        engine.event_buffer.append({"type": "ATC", "msg": f"CLEARED: {request.callsign} cleared for approach", "timestamp": time.time()})
+        engine.event_buffer.append({"type": "ATC", "msg": f"CLEARED: {request.callsign} cleared for immediate approach", "timestamp": time.time()})
     elif cmd == "ATC_LAND":
         if request.runway_id and engine.config:
             # 1. Validation: Does runway exist?
@@ -510,7 +531,13 @@ async def process_command(request: CommandRequest):
             if not target_rw:
                 return {"error": f"Runway '{rw_id}' not found in configuration", "code": 404}
             
-            # 2. Queue the Landing instead of immediate transition
+            # 2. Safety Check: Is the runway busy or reserved for someone else?
+            # We call engine.get_full_state() to get the dynamic status
+            status_obj = engine.get_full_state()["runway_status"].get(rw_id)
+            if status_obj and status_obj["status"] != "CLEAR" and status_obj["reserved_by"] != request.callsign:
+                return {"error": f"Runway {rw_id} is currently {status_obj['status']} ({status_obj.get('occupied_by') or status_obj.get('reserved_by') or 'Cooling Down'})", "code": 409}
+
+            # 3. Queue the Landing
             aircraft.queued_landing = {
                 "runway_id": rw_id,
                 "threshold": {"x": target_rw.start.x, "y": target_rw.start.y},
@@ -520,5 +547,59 @@ async def process_command(request: CommandRequest):
             engine.event_buffer.append({"type": "ATC", "msg": f"QUEUED: {request.callsign} cleared for landing Runway {rw_id} (Arrival sequence will be completed first)", "timestamp": time.time()})
         else:
             return {"error": "ATC_LAND requires runway_id", "code": 400}
+    elif cmd == "ATC_TAXI":
+        if aircraft.state != "ON_GATE":
+            return {"error": f"Aircraft must be ON_GATE to receive taxi clearance. Current state: {aircraft.state}", "code": 400}
+        
+        if request.runway_id:
+            rw_id = request.runway_id.upper()
+            target_rw = next((r for r in engine.config.runways if r.id == rw_id), None)
+            if not target_rw:
+                return {"error": f"Runway {rw_id} not found", "code": 404}
+            
+            aircraft.target_runway_id = rw_id
+            aircraft.runway_threshold = {"x": target_rw.start.x, "y": target_rw.start.y}
+            aircraft.runway_heading = target_rw.heading
+            
+        aircraft.state = "TAXIING"
+        engine.event_buffer.append({"type": "ATC", "msg": f"TAXIING: {request.callsign} taxi to Runway {aircraft.target_runway_id}", "timestamp": time.time()})
+    elif cmd == "ATC_LINE_UP":
+        # 1. Safety Check: Is the runway busy?
+        if not aircraft.target_runway_id:
+            return {"error": "Aircraft has no assigned departure runway", "code": 400}
+        
+        rw_id = aircraft.target_runway_id
+        status_obj = engine.get_full_state()["runway_status"].get(rw_id)
+        if status_obj and status_obj["status"] != "CLEAR" and status_obj["reserved_by"] != request.callsign:
+            return {"error": f"Runway {rw_id} is currently {status_obj['status']} ({status_obj.get('occupied_by') or status_obj.get('reserved_by') or 'Cooldown'})", "code": 409}
+
+        # 2. Claim the lock
+        engine.runway_status[rw_id]["occupied_by"] = request.callsign
+        aircraft.state = "LINE_UP"
+        engine.event_buffer.append({"type": "ATC", "msg": f"LINE-UP: {request.callsign} lining up Runway {rw_id}", "timestamp": time.time()})
+        
+    elif cmd == "ATC_TAKEOFF":
+        if aircraft.state not in ["LINE_UP", "HOLDING_SHORT"]:
+            return {"error": f"Aircraft must be LINED UP or HOLDING SHORT before takeoff. Current state: {aircraft.state}", "code": 400}
+        
+        rw_id = aircraft.target_runway_id
+        if not rw_id:
+            return {"error": "Aircraft has no assigned departure runway", "code": 400}
+
+        if aircraft.state == "HOLDING_SHORT":
+            # 1. Safety Check: Is the runway busy?
+            status_obj = engine.get_full_state()["runway_status"].get(rw_id)
+            if status_obj and status_obj["status"] != "CLEAR" and status_obj["reserved_by"] != request.callsign:
+                return {"error": f"Runway {rw_id} is currently {status_obj['status']} ({status_obj.get('occupied_by') or status_obj.get('reserved_by') or 'Cooldown'})", "code": 409}
+
+            # 2. Automation: Start line-up with timer
+            aircraft.state = "LINE_UP"
+            aircraft.line_up_timer = 30.0
+            engine.runway_status[rw_id]["occupied_by"] = request.callsign
+            engine.event_buffer.append({"type": "ATC", "msg": f"LINE-UP & WAIT: {request.callsign} entering Runway {rw_id} (Alignment: 30s)", "timestamp": time.time()})
+        else:
+            # Already lined up, immediate takeoff
+            aircraft.state = "TAKEOFF_ROLL"
+            engine.event_buffer.append({"type": "ATC", "msg": f"CLEARED FOR TAKEOFF: {request.callsign} Runway {rw_id}", "timestamp": time.time()})
         
     return {"status": "ATC Command processed"}

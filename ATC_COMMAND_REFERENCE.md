@@ -80,6 +80,25 @@ Clears aircraft for landing. **Aircraft will complete its current STAR route** a
 
 ---
 
+## Departure & Ground Operations
+
+### 9. Taxi
+Clears an aircraft to push back from its terminal stand and taxi to the runway.
+*   **Syntax**: `ATC TAXI <CALLSIGN> TO <RUNWAY_ID>`
+*   **Example**: `ATC TAXI UA123 TO RWY_1`
+*   **Note**: Aircraft must be in the `ON_GATE` state. It will automatically move at 20kts to the runway threshold.
+
+### 10. Takeoff (Automated Line-up & Roll)
+Clears an aircraft for departure. This is the primary command for all departing aircraft at the threshold.
+*   **Syntax**: `ATC TAKEOFF <CALLSIGN>`
+*   **Example**: `ATC TAKEOFF UA123`
+*   **Note**: 
+    - **Step 1 (Auto-Alignment)**: If the aircraft is at the threshold (`HOLDING_SHORT`), it will automatically enter the runway and wait for **30 seconds** to align.
+    - **Step 2 (Takeoff Roll)**: Once aligned, the aircraft automatically begins its takeoff roll, rotating at **160 knots**.
+    - If the aircraft is already aligned (`LINE_UP`), it begins the takeoff roll immediately.
+
+---
+
 ## Notes for Users
 1.  **Case Sensitivity**: The parser automatically converts commands and callsigns to uppercase.
 2.  **Real-time Updates**: These commands are processed immediately by the simulation engine and reflected on the Radar visualizer.

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 
 export default function AdminPanel({
+  gameState,
   airports = [],
   activeAirport,
   activeAirportConfig,
@@ -24,16 +25,20 @@ export default function AdminPanel({
     type: "B738",
     altitude: 10000,
     speed: 250,
-    gate: "N"
+    gate: "N",
+    isDeparture: false,
+    runwayId: "",
+    terminalGateId: ""
   });
 
   const handleSpawn = () => {
     sendWSMessage('spawn', {
-      gate: spawnFields.gate,
-      callsign: spawnFields.callsign,
-      type: spawnFields.type,
-      altitude: parseInt(spawnFields.altitude),
-      speed: parseInt(spawnFields.speed)
+      ...spawnFields,
+      is_departure: spawnFields.isDeparture,
+      runway_id: spawnFields.runwayId,
+      terminal_gate_id: spawnFields.terminalGateId,
+      altitude: parseInt(spawnFields.altitude || 0),
+      speed: parseInt(spawnFields.speed || 0)
     });
     setSpawnFields(prev => ({
       ...prev,
@@ -202,23 +207,55 @@ export default function AdminPanel({
       {/* Runway Management */}
       <div className="section" style={{ borderTop: '1px solid #f0f0f0', paddingTop: '12px', marginTop: '12px' }}>
         <h4 style={{ margin: '0 0 8px 0', fontSize: '0.7rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Runways ({activeAirport?.name})</h4>
-        <div style={{ maxHeight: '80px', overflowY: 'auto', background: '#fafafa', padding: '4px', borderRadius: '4px', border: '1px solid #eee', marginBottom: '8px' }}>
-          {activeAirport?.runways?.map(rw => (
-            <div key={rw.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 4px', borderBottom: '1px solid #f9f9f9', color: '#444' }}>
-              <span style={{ fontSize: '0.65rem' }}>{rw.id} <span style={{ color: '#999' }}>{rw.heading}°</span></span>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                <button onClick={() => setEditingRunway({ rw })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.65rem' }}>✏️</button>
-                <button
-                  onClick={() => {
-                    if (window.confirm(`Delete runway ${rw.id}?`)) {
-                      sendWSMessage('delete_runway', { airport_code: activeAirport.airport_code, runway_id: rw.id });
-                    }
-                  }}
-                  style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}
-                >&times;</button>
+        <div style={{ maxHeight: '120px', overflowY: 'auto', background: '#fafafa', padding: '4px', borderRadius: '4px', border: '1px solid #eee', marginBottom: '8px' }}>
+          {activeAirport?.runways?.map(rw => {
+            const statusObj = gameState?.runway_status?.[rw.id];
+            const status = statusObj?.status || "CLEAR";
+            
+            let statusColor = "#6c757d"; // Clear
+            let statusText = "CLEAR";
+            
+            if (status === "OCCUPIED") {
+              statusColor = "#dc3545"; // Red
+              statusText = statusObj.occupied_by;
+            } else if (status === "RESERVED") {
+              statusColor = "#007bff"; // Blue
+              statusText = `Reserved: ${statusObj.reserved_by}`;
+            } else if (status === "COOLDOWN") {
+              statusColor = "#ffc107"; // Amber
+              statusText = `Cooling: ${statusObj.cooldown_remaining}s`;
+            }
+
+            return (
+              <div key={rw.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 4px', borderBottom: '1px solid #f0f0f0', color: '#444' }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>{rw.heading.toFixed(0).padStart(2, '0')} [{rw.id}]</span>
+                  <span style={{ 
+                    fontSize: '0.55rem', 
+                    color: status === "CLEAR" ? "#28a745" : "white", 
+                    background: status === "CLEAR" ? "none" : statusColor,
+                    padding: status === "CLEAR" ? "0" : "1px 4px",
+                    borderRadius: '2px',
+                    fontWeight: 'bold',
+                    width: 'fit-content'
+                  }}>
+                    {statusText}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button onClick={() => setEditingRunway({ rw })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.7rem' }}>✏️</button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Delete runway ${rw.id}?`)) {
+                        sendWSMessage('delete_runway', { airport_code: activeAirport.airport_code, runway_id: rw.id });
+                      }
+                    }}
+                    style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}
+                  >&times;</button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <button
           className="btn"
@@ -339,19 +376,78 @@ export default function AdminPanel({
             onChange={e => setSpawnFields({ ...spawnFields, callsign: e.target.value })} 
             style={{ padding: '6px', fontSize: '0.7rem', border: '1px solid #eee', borderRadius: '4px' }} 
           />
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            <label style={{ fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={spawnFields.isDeparture} 
+                onChange={e => setSpawnFields({ ...spawnFields, isDeparture: e.target.checked })} 
+              />
+              Departure
+            </label>
+            {spawnFields.isDeparture && (
+              <select 
+                value={spawnFields.runwayId} 
+                onChange={e => setSpawnFields({ ...spawnFields, runwayId: e.target.value })} 
+                style={{ flex: 1, fontSize: '0.65rem', padding: '4px', border: '1px solid #eee' }}
+              >
+                <option value="">Select Runway...</option>
+                {activeAirport?.runways?.map(rw => <option key={rw.id} value={rw.id}>{rw.id}</option>)}
+              </select>
+            )}
+          </div>
+
           <div style={{ display: 'flex', gap: '4px' }}>
-            <select 
-              value={spawnFields.gate} 
-              onChange={e => setSpawnFields({ ...spawnFields, gate: e.target.value })} 
-              style={{ flex: 1, fontSize: '0.65rem', padding: '4px', border: '1px solid #eee' }}
-            >
-              {activeAirportConfig?.gates ? 
-                Object.keys(activeAirportConfig.gates).map(g => <option key={g} value={g}>{g}</option>) :
-                <><option value="N">N</option><option value="S">S</option><option value="E">E</option><option value="W">W</option></>
-              }
-            </select>
-            <input type="number" placeholder="Alt" value={spawnFields.altitude} onChange={e => setSpawnFields({ ...spawnFields, altitude: e.target.value })} style={{ flex: 1, padding: '4px', fontSize: '0.65rem', border: '1px solid #eee' }} />
-            <input type="number" placeholder="Spd" value={spawnFields.speed} onChange={e => setSpawnFields({ ...spawnFields, speed: e.target.value })} style={{ flex: 1, padding: '4px', fontSize: '0.65rem', border: '1px solid #eee' }} />
+            {/* Case 1: Arrival (Always show Entry Gate) */}
+            {!spawnFields.isDeparture && (
+              <select 
+                value={spawnFields.gate} 
+                onChange={e => setSpawnFields({ ...spawnFields, gate: e.target.value })} 
+                style={{ flex: 1, fontSize: '0.65rem', padding: '4px', border: '1px solid #eee' }}
+              >
+                <option value="" disabled>Entry Gate</option>
+                {activeAirportConfig?.gates ? 
+                  Object.keys(activeAirportConfig.gates).map(g => <option key={g} value={g}>{g}</option>) :
+                  <><option value="N">N</option><option value="S">S</option><option value="E">E</option><option value="W">W</option></>
+                }
+              </select>
+            )}
+
+            {/* Case 2: Departure (Show BOTH Exit Gate and Terminal Stand) */}
+            {spawnFields.isDeparture && (
+              <>
+                <select 
+                  value={spawnFields.gate} 
+                  onChange={e => setSpawnFields({ ...spawnFields, gate: e.target.value })} 
+                  style={{ flex: 1, fontSize: '0.65rem', padding: '4px', border: '1px solid #eee' }}
+                >
+                  <option value="" disabled>Exit Gate</option>
+                  {activeAirportConfig?.gates ? 
+                    Object.keys(activeAirportConfig.gates).map(g => <option key={g} value={g}>{g}</option>) :
+                    <><option value="N">N</option><option value="S">S</option><option value="E">E</option><option value="W">W</option></>
+                  }
+                </select>
+                <select 
+                  value={spawnFields.terminalGateId} 
+                  onChange={e => setSpawnFields({ ...spawnFields, terminalGateId: e.target.value })} 
+                  style={{ flex: 1, fontSize: '0.65rem', padding: '4px', border: '1px solid #eee', background: '#f0f4ff' }}
+                >
+                  <option value="">Threshold (Direct)</option>
+                  {activeAirportConfig?.terminal_gates && 
+                    Object.keys(activeAirportConfig.terminal_gates).map(g => (
+                      <option key={g} value={g}>Stand: {g}</option>
+                    ))
+                  }
+                </select>
+              </>
+            )}
+
+            {!spawnFields.isDeparture && (
+              <>
+                <input type="number" placeholder="Alt" value={spawnFields.altitude} onChange={e => setSpawnFields({ ...spawnFields, altitude: e.target.value })} style={{ flex: 1, padding: '4px', fontSize: '0.65rem', border: '1px solid #eee' }} />
+                <input type="number" placeholder="Spd" value={spawnFields.speed} onChange={e => setSpawnFields({ ...spawnFields, speed: e.target.value })} style={{ flex: 1, padding: '4px', fontSize: '0.65rem', border: '1px solid #eee' }} />
+              </>
+            )}
           </div>
           <button onClick={handleSpawn} className="btn btn-primary" style={{ background: '#28a745', color: 'white', border: 'none', padding: '8px', fontSize: '0.7rem' }}>Spawn Flight</button>
         </div>

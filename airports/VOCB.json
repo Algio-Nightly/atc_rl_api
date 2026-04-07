@@ -31,6 +31,24 @@
       "y": 0.0
     }
   },
+  "terminal_gates": {
+    "G1": {
+      "x": 0.2,
+      "y": 0.2
+    },
+    "G2": {
+      "x": -0.2,
+      "y": 0.2
+    },
+    "G3": {
+      "x": 0.2,
+      "y": -0.2
+    },
+    "G4": {
+      "x": -0.2,
+      "y": -0.2
+    }
+  },
   "runways": [
     {
       "id": "RWY_1",
@@ -47,6 +65,10 @@
       "iaf": {
         "x": -14.768533309420064,
         "y": -14.85238987761825
+      },
+      "dp": {
+        "x": 17.86,
+        "y": 17.48
       }
     },
     {
@@ -64,6 +86,10 @@
       "iaf": {
         "x": 15.947479490003007,
         "y": 15.189854570196102
+      },
+      "dp": {
+        "x": -17.86,
+        "y": -17.48
       }
     }
   ],
@@ -188,6 +214,28 @@
       "is_iaf": false,
       "is_faf": false,
       "holding_stack": []
+    },
+    "DP_RWY_1": {
+      "id": "DP_RWY_1",
+      "name": "DP",
+      "x": 17.86,
+      "y": 17.48,
+      "target_alt": 6000,
+      "target_speed": 250,
+      "is_iaf": false,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "DP_RWY_1_REV": {
+      "id": "DP_RWY_1_REV",
+      "name": "DP",
+      "x": -17.86,
+      "y": -17.48,
+      "target_alt": 6000,
+      "target_speed": 250,
+      "is_iaf": false,
+      "is_faf": false,
+      "holding_stack": []
     }
   },
   "stars": {
@@ -203,6 +251,50 @@
         "c3a2fccd-7b0f-45ab-8e0c-f9bcf1031cee",
         "IAF_RWY_1_REV",
         "FAF_RWY_1_REV"
+      ],
+      "RWY_1": [
+        "995a5815-613e-4732-a8f6-d66181079d32",
+        "f7730339-0a3c-4522-ae58-5d97fb83146f",
+        "IAF_RWY_1",
+        "FAF_RWY_1"
+      ]
+    }
+  },
+  "sids": {
+    "RWY_1": {
+      "N": [
+        "DP_RWY_1",
+        "N"
+      ],
+      "S": [
+        "DP_RWY_1",
+        "S"
+      ],
+      "E": [
+        "DP_RWY_1",
+        "E"
+      ],
+      "W": [
+        "DP_RWY_1",
+        "W"
+      ]
+    },
+    "RWY_1_REV": {
+      "N": [
+        "DP_RWY_1_REV",
+        "N"
+      ],
+      "S": [
+        "DP_RWY_1_REV",
+        "S"
+      ],
+      "E": [
+        "DP_RWY_1_REV",
+        "E"
+      ],
+      "W": [
+        "DP_RWY_1_REV",
+        "W"
       ]
     }
   },

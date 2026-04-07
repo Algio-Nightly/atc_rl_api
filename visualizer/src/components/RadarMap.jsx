@@ -254,13 +254,17 @@ export default function RadarMap({
             const pos = xyToLatLon(wp.x, wp.y, activeAirport);
             const isIAF = wp.is_iaf || wp.name?.includes("IAF");
             const isFAF = wp.is_faf || wp.name?.includes("FAF");
-            const color = isIAF ? "#4B0082" : "#555"; // Neutral gray for non-assigned points
+            const isDP = wp.name?.includes("DP");
+            
+            // Color logic: Departure (Greenish), IAF (Purple), FAF (Orange/Gray)
+            const color = isIAF ? "#4B0082" : (isDP ? "#28a745" : "#555");
+            const label = isIAF ? "IAF" : (isFAF ? "FAF" : (isDP ? "DP" : "WP"));
 
             return (
               <Marker
                 key={`wp-pool-${wp.id}`}
                 position={pos}
-                icon={createWaypointIcon(isIAF ? "IAF" : (isFAF ? "FAF" : "WP"), color, 0.9, isIAF, isFAF)}
+                icon={createWaypointIcon(label, color, 0.9, isIAF, isFAF)}
                 eventHandlers={{
                   click: (e) => {
                     if (draftingMode === 'route') {
