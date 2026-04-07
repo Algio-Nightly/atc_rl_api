@@ -21,6 +21,9 @@ SUPPORTED_COMMANDS = {
     "APPROACH",
     "LAND",
     "RESUME",
+    "TAXI",
+    "LINE_UP",
+    "TAKEOFF",
 }
 
 
@@ -119,8 +122,8 @@ def _parse_single_line(line: str, original_input: str) -> dict:
             raw_input=original_input,
         )
 
-    # VECTOR, ALTITUDE, SPEED, DIRECT, LAND require callsign + parameter
-    if command in ("VECTOR", "ALTITUDE", "SPEED", "DIRECT", "LAND"):
+    # VECTOR, ALTITUDE, SPEED, DIRECT, LAND, TAXI require callsign + parameter
+    if command in ("VECTOR", "ALTITUDE", "SPEED", "DIRECT", "LAND", "TAXI"):
         if len(parts) < 3:
             raise ParseError(
                 f"'{command}' command requires callsign and value. Format: ATC {command} <CALLSIGN> <VALUE>",
@@ -150,6 +153,8 @@ def _parse_single_line(line: str, original_input: str) -> dict:
             result["waypoint"] = value
         elif command == "LAND":
             result["runway"] = value
+        elif command == "TAXI":
+            result["runway"] = value
 
         return result
 
@@ -176,8 +181,8 @@ def _parse_single_line(line: str, original_input: str) -> dict:
 
         return result
 
-    # APPROACH and RESUME commands: only require callsign
-    elif command in ("APPROACH", "RESUME"):
+    # APPROACH, RESUME, LINE_UP, and TAKEOFF commands: only require callsign
+    elif command in ("APPROACH", "RESUME", "LINE_UP", "TAKEOFF"):
         if len(parts) < 3:
             raise ParseError(
                 f"'{command}' command requires callsign. Format: ATC {command} <CALLSIGN>",

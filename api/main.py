@@ -328,7 +328,9 @@ async def process_command(request: CommandRequest):
                 aircraft.state = "ENROUTE"
                 engine.event_buffer.append({"type": "ATC", "msg": f"DIRECT: {request.callsign} to {found_wp.name}", "timestamp": time.time()})
                 return {"status": "success"}
-            return {"error": f"Target '{request.waypoint_name}' not found", "code": 404}
+            msg = f"Target '{request.waypoint_name}' not found"
+            aircraft.command_rejections.append(f"DIRECT_TO (Rejected: {msg})")
+            return {"error": msg, "code": 404}
     elif cmd == "ATC_RESUME":
         aircraft.state, aircraft.direct_to_wp = "ENROUTE", None
         aircraft.manual_target_alt = aircraft.manual_target_speed = None
@@ -337,7 +339,10 @@ async def process_command(request: CommandRequest):
         if request.runway_id and engine.config:
             rw_id = request.runway_id.upper()
             target_rw = next((r for r in engine.config.runways if r.id == rw_id), None)
-            if not target_rw: return {"error": f"Runway {rw_id} not found", "code": 404}
+            if not target_rw:
+                msg = f"Runway {rw_id} not found"
+                aircraft.command_rejections.append(f"LAND (Rejected: {msg})")
+                return {"error": msg, "code": 404}
             entry_gate = aircraft.gate or "N"
             new_route, msg_suffix = engine.config.stars.get(entry_gate, {}).get(rw_id), ""
             if new_route:
@@ -345,9 +350,15 @@ async def process_command(request: CommandRequest):
                 msg_suffix = f" via {engine.config.star_names.get(f'{entry_gate}:{rw_id}', 'STD')}"
             aircraft.queued_landing = {"runway_id": rw_id, "threshold": {"x": target_rw.start.x, "y": target_rw.start.y}, "runway_heading": target_rw.heading}
             engine.event_buffer.append({"type": "ATC", "msg": f"CLEARED LAND: {request.callsign} RWY {rw_id}{msg_suffix}", "timestamp": time.time()})
-        else: return {"error": "Missing runway_id", "code": 400}
+        else:
+            msg = "Missing runway_id"
+            aircraft.command_rejections.append(f"LAND (Rejected: {msg})")
+            return {"error": msg, "code": 400}
     elif cmd == "ATC_TAXI":
-        if aircraft.state != "ON_GATE": return {"error": "Must be ON_GATE", "code": 400}
+        if aircraft.state != "ON_GATE":
+            msg = "Must be ON_GATE"
+            aircraft.command_rejections.append(f"TAXI (Rejected: {msg})")
+            return {"error": msg, "code": 400}
         if request.runway_id:
             rw_id = request.runway_id.upper()
             target_rw = next((r for r in engine.config.runways if r.id == rw_id), None)
@@ -355,12 +366,28 @@ async def process_command(request: CommandRequest):
         aircraft.state = "TAXIING"
         engine.event_buffer.append({"type": "ATC", "msg": f"TAXI: {request.callsign} to RWY {aircraft.target_runway_id}", "timestamp": time.time()})
     elif cmd == "ATC_LINE_UP":
-        if not aircraft.target_runway_id: return {"error": "No runway assigned", "code": 400}
+        if not aircraft.target_runway_id:
+            msg = "No runway assigned"
+            aircraft.command_rejections.append(f"LINE_UP (Rejected: {msg})")
+            return {"error": msg, "code": 400}
         aircraft.state = "LINE_UP"
         engine.runway_status[aircraft.target_runway_id]["occupied_by"] = request.callsign
         engine.event_buffer.append({"type": "ATC", "msg": f"LINE-UP: {request.callsign} RWY {aircraft.target_runway_id}", "timestamp": time.time()})
     elif cmd == "ATC_TAKEOFF":
-        if aircraft.state not in ["LINE_UP", "HOLDING_SHORT"]: return {"error": "Incorrect state", "code": 400}
-        aircraft.state = "TAKEOFF_ROLL"
-        engine.event_buffer.append({"type": "ATC", "msg": f"CLEARED TAKEOFF: {request.callsign}", "timestamp": time.time()})
+        if aircraft.state == "TAXIING":
+            aircraft.queued_takeoff = True
+            engine.event_buffer.append({"type": "ATC", "msg": f"QUEUED TAKEOFF: {request.callsign}", "timestamp": time.time()})
+        elif aircraft.state == "HOLDING_SHORT":
+            aircraft.state = "LINE_UP"
+            aircraft.line_up_timer = 30.0
+            if aircraft.target_runway_id:
+                engine.runway_status[aircraft.target_runway_id]["occupied_by"] = request.callsign
+            engine.event_buffer.append({"type": "ATC", "msg": f"CLEARED TAKEOFF: {request.callsign} (Aligning)", "timestamp": time.time()})
+        elif aircraft.state == "LINE_UP":
+            aircraft.state = "TAKEOFF_ROLL"
+            engine.event_buffer.append({"type": "ATC", "msg": f"CLEARED TAKEOFF: {request.callsign}", "timestamp": time.time()})
+        else:
+            msg = f"Cannot takeoff from state '{aircraft.state}'"
+            aircraft.command_rejections.append(f"TAKEOFF (Rejected: {msg})")
+            return {"error": msg, "code": 400}
     return {"status": "success"}

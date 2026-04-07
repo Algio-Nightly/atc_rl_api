@@ -208,6 +208,13 @@ class SimulationEngine:
                     # Skip violation if they are on ground close to each other
                     if a1.altitude < 100 and a2.altitude < 100:
                         continue
+                    
+                    # Push metrics to individual aircraft
+                    a1.separation_warnings += 1
+                    a1.closest_proximity_km = min(a1.closest_proximity_km, round(dist, 2))
+                    a2.separation_warnings += 1
+                    a2.closest_proximity_km = min(a2.closest_proximity_km, round(dist, 2))
+                    
                     self.event_buffer.append({"type": "SEPARATION_VIOLATION", "participants": [a1.callsign, a2.callsign], "timestamp": time.time()})
 
     def reset_environment(self):

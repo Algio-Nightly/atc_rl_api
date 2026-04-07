@@ -25,7 +25,7 @@ const createPlaneIcon = (heading, isSelected, scale = 1) => {
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2]
   });
-  
+
   planeIconCache[key] = icon;
   return icon;
 };

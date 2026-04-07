@@ -20,10 +20,10 @@ export default function FlightRoster({ flights, onSelectFlight, gameState, sendW
         <h3 style={{ fontSize: '0.75rem', color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Active Flights ({flights.length})</h3>
         <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {flights.map((flight) => (
-            <div 
-              key={flight.callsign} 
+            <div
+              key={flight.callsign}
               className="flight-item"
-              style={{ 
+              style={{
                 position: 'relative',
                 padding: '12px',
                 background: '#fcfcfc',
@@ -37,13 +37,13 @@ export default function FlightRoster({ flights, onSelectFlight, gameState, sendW
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <strong style={{ color: '#1a1a1a', fontSize: '0.95rem' }}>{flight.callsign} <span style={{ fontWeight: 'normal', color: '#6c757d', fontSize: '0.75rem' }}>{flight.type}</span></strong>
-                <button 
+                <button
                   title="Remove Aircraft"
-                  style={{ 
-                    background: 'none', 
-                    border: 'none', 
-                    color: '#dc3545', 
-                    cursor: 'pointer', 
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#dc3545',
+                    cursor: 'pointer',
                     fontSize: '1.2rem',
                     padding: '0 4px',
                     display: 'flex',
@@ -56,7 +56,7 @@ export default function FlightRoster({ flights, onSelectFlight, gameState, sendW
                   onClick={(e) => {
                     e.stopPropagation();
                     if (sendWSMessage) {
-                       sendWSMessage('delete_aircraft', { callsign: flight.callsign });
+                      sendWSMessage('delete_aircraft', { callsign: flight.callsign });
                     }
                   }}
                 >×</button>
@@ -73,9 +73,9 @@ export default function FlightRoster({ flights, onSelectFlight, gameState, sendW
       </div>
 
       {/* Waypoint Inspector (Bottom Sticky) */}
-      <div style={{ 
-        marginTop: 'auto', 
-        paddingTop: '16px', 
+      <div style={{
+        marginTop: 'auto',
+        paddingTop: '16px',
         borderTop: '2px solid #007bff',
         background: hoveredWaypoint ? '#f0f7ff' : '#fafafa',
         padding: '16px',

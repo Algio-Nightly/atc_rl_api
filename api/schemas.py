@@ -52,6 +52,7 @@ class AircraftState(BaseModel):
     active_star: Optional[str] = None
     wp_index: int = 0
     is_holding: bool = False
+    queued_takeoff: bool = False
 
 
 class CommandRequest(BaseModel):
