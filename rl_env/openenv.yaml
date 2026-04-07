@@ -1,0 +1,11 @@
+name: atc-rl-env
+version: 1.0.0
+description: ATC RL Environment for LLM agents
+environment:
+  api: openenv_core.Environment
+  observation: ATCObservation
+  action: ATCAction
+tasks:
+  - single_approach
+  - traffic_pattern
+  - storm_traffic
