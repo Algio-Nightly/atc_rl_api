@@ -3,6 +3,7 @@ numpy>=2.4.4
 openenv-core>=0.2.3
 pydantic>=2.12.5
 pygame>=2.6.1
+python-dotenv>=1.0.0
 requests>=2.33.1
 torch>=2.11.0
 uvicorn>=0.43.0

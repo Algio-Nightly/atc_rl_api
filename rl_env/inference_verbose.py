@@ -3,6 +3,9 @@
 import os
 import sys
 import re
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from rl_env.client import LLMClient
 from rl_env.environment import ATCEnv
