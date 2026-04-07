@@ -52,12 +52,26 @@ def run_episode(
 
             if VERBOSE:
                 print(f"📥 MODEL RESPONSE:\n")
-                print(llm_response)
-                print(f"\n{'─' * 60}")
-
-            commands = []
-            try:
-                parsed = parse(llm_response)
+                
+                # Try to find ATC commands in the response
+                import re
+                cmd_pattern = r'ATC\s+\w+\s+\w+(?:\s+\S+)?'
+                matches = re.findall(cmd_pattern, llm_response, re.IGNORECASE)
+                
+                if matches:
+                    # Extract commands and show them separately
+                    thinking_only = llm_response
+                    for cmd in matches:
+                        thinking_only = thinking_only.replace(cmd, f'[{cmd}]')
+                    print(f"💭 THINKING:\n{thinking_only}")
+                    print(f"\n{'─'*60}")
+                    print(f"🎯 EXTRACTED COMMANDS: {matches}")
+                else:
+                    print(f"💭 THINKING:\n{llm_response}")
+                    print(f"\n{'─'*60}")
+                    print("⚠️  NO COMMANDS DETECTED IN RESPONSE")
+                
+                print(f"\n{'─'*60}")
                 if isinstance(parsed, list):
                     for cmd in parsed:
                         cmd_str = f"ATC {cmd['command']} {cmd['callsign']}"

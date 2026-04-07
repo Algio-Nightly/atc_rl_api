@@ -248,9 +248,20 @@ def generate_atc_prompt(observation: ATCObservation) -> str:
 
     # Response instruction
     lines.append("")
-    lines.append(
-        "Respond with ATC commands only in the format: ATC COMMAND CALLSIGN VALUE"
-    )
+    lines.append("Your response MUST have two sections:")
+    lines.append("")
+    lines.append("THINKING:")
+    lines.append("Explain your reasoning for each aircraft:")
+    lines.append("- What is the current situation?")
+    lines.append("- What do you plan to do and why?")
+    lines.append("")
+    lines.append("COMMANDS:")
+    lines.append("Then issue ATC commands from the VALID COMMANDS listed above.")
+    lines.append("Format: ATC COMMAND CALLSIGN VALUE")
     lines.append("Example: ATC VECTOR AAL123 270")
+    lines.append("")
+    lines.append(
+        "IMPORTANT: Commands must use the exact callsigns from CURRENT TRAFFIC section."
+    )
 
     return "\n".join(lines)
