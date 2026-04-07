@@ -158,7 +158,7 @@ class SimulationEngine:
 
             # 1. CFIT Detection (Controlled Flight Into Terrain)
             # Below 50ft when not in a ground/landing state
-            if aircraft.altitude < 50 and aircraft.state not in ["ON_GATE", "TAXIING", "HOLDING_SHORT", "LINE_UP", "TAKEOFF_ROLL", "LANDING"]:
+            if aircraft.altitude < 50 and aircraft.state not in ["ON_GATE", "TAXIING", "HOLDING_SHORT", "LINE_UP", "TAKEOFF_ROLL", "LANDING", "APPROACH", "CLIMB_OUT"]:
                 self.trigger_crash(callsign, "CFIT")
 
             # 2. Runway Overshoot (Overrun) Detection

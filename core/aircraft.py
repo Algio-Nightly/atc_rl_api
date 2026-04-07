@@ -51,7 +51,7 @@ class Aircraft:
         
         # Physics constraints
         self.turn_rate = 3.0       # Degrees per second
-        self.accel_rate = 2.0      # Knots per second
+        self.accel_rate = 4.0      # Knots per second (Boosted for takeoff on standard runways)
         self.alt_rate = 25.0       # Feet per second (~1500 fpm)
         self.fuel_burn_rate = 0.01 # Fuel % per second
 
@@ -105,6 +105,7 @@ class Aircraft:
                 self.target_heading = self.runway_heading
                 if self.speed >= 160:
                     self.state = "CLIMB_OUT"
+                    self.altitude = 10 # Rotation Nudge to ensure CFIT logic sees height
                     runway_status = engine_context.get("runway_status", {})
                     if self.target_runway_id in runway_status:
                         lock = runway_status[self.target_runway_id]
