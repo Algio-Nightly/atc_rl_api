@@ -2,6 +2,7 @@
 
 import os
 import sys
+import re
 
 from rl_env.client import LLMClient
 from rl_env.environment import ATCEnv
@@ -39,6 +40,7 @@ def run_episode(
 
         try:
             prompt = generate_atc_prompt(observation)
+            llm_response = client.generate_with_retry(prompt)
 
             if VERBOSE:
                 print(f"\n{'─' * 60}")
@@ -47,31 +49,31 @@ def run_episode(
                 print(f"\n📤 PROMPT SENT TO MODEL:\n")
                 print(prompt)
                 print(f"\n{'─' * 60}")
-
-            llm_response = client.generate_with_retry(prompt)
-
-            if VERBOSE:
                 print(f"📥 MODEL RESPONSE:\n")
-                
-                # Try to find ATC commands in the response
-                import re
-                cmd_pattern = r'ATC\s+\w+\s+\w+(?:\s+\S+)?'
+
+                # Extract commands using regex
+                cmd_pattern = r"ATC\s+\w+\s+\w+(?:\s+\S+)?"
                 matches = re.findall(cmd_pattern, llm_response, re.IGNORECASE)
-                
+
                 if matches:
-                    # Extract commands and show them separately
+                    # Show thinking with commands highlighted
                     thinking_only = llm_response
                     for cmd in matches:
-                        thinking_only = thinking_only.replace(cmd, f'[{cmd}]')
-                    print(f"💭 THINKING:\n{thinking_only}")
-                    print(f"\n{'─'*60}")
+                        thinking_only = thinking_only.replace(cmd, f"[{cmd}]")
+                    print(f"💭 THINKING (commands highlighted):\n{thinking_only}")
+                    print(f"\n{'─' * 60}")
                     print(f"🎯 EXTRACTED COMMANDS: {matches}")
                 else:
                     print(f"💭 THINKING:\n{llm_response}")
-                    print(f"\n{'─'*60}")
+                    print(f"\n{'─' * 60}")
                     print("⚠️  NO COMMANDS DETECTED IN RESPONSE")
-                
-                print(f"\n{'─'*60}")
+
+                print(f"\n{'─' * 60}")
+
+            # Parse commands
+            commands = []
+            try:
+                parsed = parse(llm_response)
                 if isinstance(parsed, list):
                     for cmd in parsed:
                         cmd_str = f"ATC {cmd['command']} {cmd['callsign']}"
@@ -105,19 +107,19 @@ def run_episode(
                 action = ATCAction(commands=commands)
 
                 if VERBOSE:
-                    print(f"✅ PARSED COMMANDS: {commands}")
+                    print(f"\n✅ PARSED COMMANDS: {commands}")
 
             except ParseError as e:
                 error = f"parse_error:{e}"
                 action = ATCAction(commands=[])
                 if VERBOSE:
-                    print(f"❌ PARSE ERROR: {e}")
+                    print(f"\n❌ PARSE ERROR: {e}")
 
         except Exception as e:
             error = f"llm_error:{e}"
             action = ATCAction(commands=[])
             if VERBOSE:
-                print(f"❌ LLM ERROR: {e}")
+                print(f"\n❌ LLM ERROR: {e}")
 
         try:
             observation, reward, done, _, info = env.step(action)
