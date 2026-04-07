@@ -53,13 +53,22 @@ def run_server():
     parent_dir = os.path.dirname(script_dir)
     ui_dir = os.path.join(script_dir, "visualizer")
 
-    # Helper to run pnpm commands robustly
-    pnpm_exe = "pnpm.cmd" if os.name == "nt" else "pnpm"
+    # Detect pnpm or npm
+    def get_pkg_manager():
+        # Check if pnpm is available
+        try:
+            subprocess.run(["pnpm", "--version"], capture_output=True, shell=True, check=True)
+            return "pnpm"
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return "npm"
+
+    pkg_manager = get_pkg_manager()
+    print(f"Using {pkg_manager} for frontend...")
 
     if args.only_ui:
         print("Starting ONLY Frontend (Vite)...")
         try:
-            subprocess.run([pnpm_exe, "run", "dev"], cwd=ui_dir)
+            subprocess.run([pkg_manager, "run", "dev"], cwd=ui_dir, shell=True)
         except KeyboardInterrupt:
             print("\nStopping UI...")
         return
@@ -71,7 +80,7 @@ def run_server():
     if args.ui:
         print("Starting Frontend (Vite)...")
         try:
-            ui_process = subprocess.Popen([pnpm_exe, "run", "dev"], cwd=ui_dir)
+            ui_process = subprocess.Popen([pkg_manager, "run", "dev"], cwd=ui_dir, shell=True)
             print(f"Frontend process started (PID: {ui_process.pid})")
         except Exception as e:
             print(f"Error starting frontend: {e}")
