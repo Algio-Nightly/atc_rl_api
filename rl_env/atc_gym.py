@@ -54,7 +54,7 @@ class ATCEnv(Environment):
             "aircraft": [],
             "airport_status": {
                 "active_runways": list(self.engine.active_runways),
-                "runway_occupancy": {},
+                "runway_states": {},
                 "wind": {
                     "heading": int(self.engine.wind_heading),
                     "speed": int(self.engine.wind_speed)
@@ -62,8 +62,13 @@ class ATCEnv(Environment):
             }
         }
         
-        for rw, status in self.engine.runway_status.items():
-            obs["airport_status"]["runway_occupancy"][rw] = status.get("occupied_by")
+        # Initialize runway states with elevations
+        if self.engine.config:
+            for r in self.engine.config.runways:
+                obs["airport_status"]["runway_states"][r.id] = {
+                    "occupancy": self.engine.runway_status.get(r.id, {}).get("occupied_by"),
+                    "elevation": r.altitude
+                }
             
         aircraft_list = list(self.engine.aircrafts.values())
         
@@ -118,7 +123,7 @@ class ATCEnv(Environment):
                     closing_speed = -(dx * dvx + dy * dvy) / closest_dist
                     if closing_speed > 10.0:  # arbitrary 10 km/h threshold to avoid noisy zeros
                         time_hrs = closest_dist / closing_speed
-                        time_to_collision = round(time_hrs * 60, 1) # minutes
+                        time_to_collision = round(time_hrs * 3600, 1) # seconds
             else:
                 closest_dist_val = None
                 
@@ -136,7 +141,7 @@ class ATCEnv(Environment):
                 tx, ty = ac.runway_threshold["x"], ac.runway_threshold["y"]
                 dist_to_thresh = round(math.sqrt((tx - ac.x)**2 + (ty - ac.y)**2), 2)
                 if ac.speed > 0:
-                    time_to_thresh = round((dist_to_thresh / (ac.speed * 1.852)) * 60, 1)
+                    time_to_thresh = round((dist_to_thresh / (ac.speed * 1.852)) * 3600, 1)
 
             next_wp = ac.active_star if ac.active_star else "None"
             if hasattr(ac, "direct_to_wp") and ac.direct_to_wp:
@@ -160,7 +165,7 @@ class ATCEnv(Environment):
                     "state": ac.state,
                     "assigned_runway": ac.target_runway_id,
                     "distance_to_threshold": dist_to_thresh,
-                    "time_to_threshold_min": time_to_thresh,
+                    "time_to_threshold": time_to_thresh,
                     "next_waypoint": next_wp
                 },
                 "alerts": alerts,
@@ -168,7 +173,7 @@ class ATCEnv(Environment):
                     "closest_traffic": closest_callsign,
                     "distance": closest_dist_val,
                     "conflict_risk": conflict_risk,
-                    "time_to_collision_min": time_to_collision
+                    "time_to_collision": time_to_collision
                 }
             }
             obs["aircraft"].append(ac_obj)
