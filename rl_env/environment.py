@@ -1,0 +1,763 @@
+"""ATC RL Environment - Main OpenEnv interface for ATC simulation."""
+
+import math
+import uuid
+from typing import Optional, Any
+
+from openenv_core import Environment
+
+from core.engine import SimulationEngine
+from rl_env.models import (
+    ATCAction,
+    ATCObservation,
+    ATCState,
+    AircraftObservation,
+    Position,
+    Motion,
+    Intent,
+    Separation,
+    AirportStatus,
+    Metrics,
+    Wind,
+)
+from rl_env.rubrics import ATCRubric
+from rl_env.parsers import parse, ParseError
+
+
+# Task configuration constants
+TASK_CONFIGS = {
+    "single_approach": {
+        "aircraft_count": 1,
+        "spawn_distance_km": 15.0,
+        "gates": ["N"],
+        "ac_types": ["B737"],
+        "weight_classes": ["Heavy"],
+    },
+    "traffic_pattern": {
+        "aircraft_count": 4,
+        "spawn_distance_km": 20.0,
+        "gates": ["N", "S", "E", "W"],
+        "ac_types": ["B737", "A320", "B777", "E190"],
+        "weight_classes": ["Heavy", "Medium", "Light"],
+    },
+    "storm_traffic": {
+        "aircraft_count": 10,
+        "spawn_distance_km": 25.0,
+        "gates": ["N", "S", "E", "W", "N", "S", "E", "W", "N", "S"],
+        "ac_types": ["B737", "A320", "B777", "E190", "A350"],
+        "weight_classes": ["Heavy", "Medium", "Light", "Heavy", "Medium"],
+    },
+}
+
+# Segment labels for position calculation
+SEGMENTS_LABELS = [
+    "North",
+    "North-East",
+    "East",
+    "South-East",
+    "South",
+    "South-West",
+    "West",
+    "North-West",
+]
+
+# Default airport code
+DEFAULT_AIRPORT = "HEAT"
+
+
+class ATCEnv(Environment):
+    """
+    ATC Reinforcement Learning Environment using Meta OpenEnv.
+
+    Integrates simulation engine, command parser, rubrics, and observation generation
+    to provide a complete RL interface for ATC training scenarios.
+    """
+
+    def __init__(self, airport_code: str = DEFAULT_AIRPORT):
+        """
+        Initialize the ATC environment.
+
+        Args:
+            airport_code: ICAO airport code to use (default: HEAT)
+        """
+        super().__init__()
+        self.airport_code = airport_code
+        self.engine: Optional[SimulationEngine] = None
+        self.rubric = ATCRubric()
+        self.episode_id: Optional[str] = None
+        self.step_count: int = 0
+        self.task_name: Optional[str] = None
+        self.cumulative_reward: float = 0.0
+        self.command_history: dict[
+            str, list[str]
+        ] = {}  # For redundant command detection
+        self._previous_observation: Optional[ATCObservation] = None
+        self._initial_aircraft_count: int = 0
+
+    def reset(
+        self, seed: Optional[int] = None, task: str = "single_approach"
+    ) -> tuple[ATCObservation, dict]:
+        """
+        Reset the simulation to initial state for a new episode.
+
+        Args:
+            seed: Random seed for reproducibility (optional)
+            task: Task configuration name (single_approach, traffic_pattern, storm_traffic)
+
+        Returns:
+            Tuple of (observation, info dict)
+        """
+        super().reset(seed=seed)
+
+        # Initialize new episode
+        self.engine = SimulationEngine()
+        self.episode_id = f"ep_{uuid.uuid4().hex[:8]}"
+        self.step_count = 0
+        self.cumulative_reward = 0.0
+        self.command_history = {}
+        self._previous_observation = None
+
+        # Load airport configuration directly from JSON
+        config = self._load_airport_config(self.airport_code)
+        self.engine.load_airport(config)
+
+        # Get task configuration (default to single_approach if not found)
+        task_config = TASK_CONFIGS.get(task, TASK_CONFIGS["single_approach"])
+        self.task_name = task
+
+        # Spawn aircraft based on task
+        self._spawn_aircraft_for_task(task_config)
+
+        # Get initial observation
+        observation = self._build_observation()
+        self._previous_observation = observation
+        self._initial_aircraft_count = len(self.engine.aircrafts)
+
+        info = {
+            "episode_id": self.episode_id,
+            "task_name": self.task_name,
+            "initial_aircraft_count": self._initial_aircraft_count,
+        }
+
+        return observation, info
+
+    def _spawn_aircraft_for_task(self, task_config: dict) -> None:
+        """
+        Spawn aircraft according to task configuration.
+
+        Args:
+            task_config: Dictionary containing aircraft_count, spawn_distance_km, gates, etc.
+        """
+        import random
+
+        aircraft_count = task_config["aircraft_count"]
+        spawn_distance_km = task_config["spawn_distance_km"]
+        gates = task_config["gates"]
+        ac_types = task_config["ac_types"]
+        weight_classes = task_config["weight_classes"]
+
+        for i in range(aircraft_count):
+            callsign = f"RL{i + 1:03d}"
+            gate = gates[i % len(gates)]
+            ac_type = ac_types[i % len(ac_types)]
+            weight_class = weight_classes[i % len(weight_classes)]
+
+            # Calculate spawn altitude (higher for longer distances)
+            base_altitude = 8000 + (i * 1000)
+            altitude = min(base_altitude, 15000)
+
+            # Calculate heading toward center (0,0) from gate position
+            if self.engine.config and gate in self.engine.config.gates:
+                gate_pos = self.engine.config.gates[gate]
+                dx = 0 - gate_pos.x
+                dy = 0 - gate_pos.y
+                heading = (90 - math.degrees(math.atan2(dy, dx))) % 360
+            else:
+                heading = None
+
+            # Spawn the aircraft
+            self.engine.add_aircraft(
+                callsign=callsign,
+                ac_type=ac_type,
+                weight_class=weight_class,
+                gate=gate,
+                altitude=altitude,
+                heading=heading,
+                speed=250,
+            )
+
+    def _load_airport_config(self, airport_code: str):
+        import json
+        from pathlib import Path
+
+        airports_dir = Path(__file__).parent.parent / "airports"
+        config_path = airports_dir / f"{airport_code.upper()}.json"
+
+        if not config_path.exists():
+            raise ValueError(f"Airport config not found: {config_path}")
+
+        with open(config_path, "r") as f:
+            data = json.load(f)
+
+        return AirportConfigDirect(data)
+
+    def step(self, action: ATCAction) -> tuple[ATCObservation, float, bool, bool, dict]:
+        """
+        Execute one step of the simulation.
+
+        Args:
+            action: ATCAction containing commands to execute
+
+        Returns:
+            Tuple of (observation, reward, done, truncated, info)
+        """
+        self.step_count += 1
+
+        # Parse and execute commands
+        self._execute_commands(action)
+
+        # Advance simulation by one step (1 second in sim time)
+        self.engine.step(1.0)
+
+        # Build new observation
+        observation = self._build_observation()
+
+        # Calculate reward using rubrics
+        reward = self.rubric.forward(action, observation)
+        self.cumulative_reward += reward
+
+        # Check terminal conditions
+        done = self._check_terminal_conditions(observation)
+
+        # Build info dict
+        info = {
+            "episode_id": self.episode_id,
+            "step_count": self.step_count,
+            "task_name": self.task_name,
+            "cumulative_reward": self.cumulative_reward,
+            "terminal_event": self._get_terminal_event() if done else None,
+        }
+
+        # Always return truncated=False (we handle episode termination via done)
+        truncated = False
+
+        self._previous_observation = observation
+
+        return observation, reward, done, truncated, info
+
+    def _execute_commands(self, action: ATCAction) -> None:
+        """
+        Parse and execute ATC commands.
+
+        Args:
+            action: ATCAction containing command strings
+        """
+        if not action.commands:
+            return
+
+        for cmd_str in action.commands:
+            try:
+                parsed = parse(cmd_str)
+                # Handle batch parsing (returns list) or single command (returns dict)
+                commands = parsed if isinstance(parsed, list) else [parsed]
+
+                for cmd in commands:
+                    self._execute_single_command(cmd)
+            except ParseError as e:
+                # Log parse error but continue with other commands
+                self.engine.event_buffer.append(
+                    {
+                        "type": "PARSE_ERROR",
+                        "msg": f"Failed to parse command: {e}",
+                        "timestamp": time.time(),
+                    }
+                )
+                continue
+
+    def _execute_single_command(self, cmd: dict) -> None:
+        """
+        Execute a single parsed command on the simulation engine.
+
+        Args:
+            cmd: Parsed command dictionary
+        """
+        import time
+
+        command = cmd.get("command", "").upper()
+        callsign = cmd.get("callsign", "").upper()
+
+        # Check if aircraft exists
+        if callsign not in self.engine.aircrafts:
+            self.engine.event_buffer.append(
+                {
+                    "type": "COMMAND_ERROR",
+                    "msg": f"Aircraft '{callsign}' not found",
+                    "timestamp": time.time(),
+                }
+            )
+            return
+
+        aircraft = self.engine.aircrafts[callsign]
+
+        if command == "VECTOR":
+            heading = cmd.get("heading")
+            if heading is not None:
+                aircraft.target_heading = float(heading)
+                self.engine.event_buffer.append(
+                    {
+                        "type": "ATC",
+                        "msg": f"HEADING: {callsign} -> {heading}°",
+                        "timestamp": time.time(),
+                    }
+                )
+
+        elif command == "ALTITUDE":
+            altitude = cmd.get("altitude")
+            if altitude is not None:
+                aircraft.target_alt = float(altitude)
+                self.engine.event_buffer.append(
+                    {
+                        "type": "ATC",
+                        "msg": f"ALTITUDE: {callsign} -> {altitude}ft",
+                        "timestamp": time.time(),
+                    }
+                )
+
+        elif command == "SPEED":
+            speed = cmd.get("speed")
+            if speed is not None:
+                aircraft.target_speed = float(speed)
+                self.engine.event_buffer.append(
+                    {
+                        "type": "ATC",
+                        "msg": f"SPEED: {callsign} -> {speed}kts",
+                        "timestamp": time.time(),
+                    }
+                )
+
+        elif command == "HOLD":
+            waypoint = cmd.get("waypoint")
+            altitude = cmd.get("altitude")
+            aircraft.state = "HOLDING"
+            if waypoint and self.engine.config:
+                # Look up waypoint position
+                search_term = waypoint.upper()
+                found_wp = None
+                for wp in self.engine.config.waypoints.values():
+                    if (
+                        wp.name and wp.name.upper() == search_term
+                    ) or wp.id.upper() == search_term:
+                        found_wp = wp.model_dump()
+                        break
+                if found_wp:
+                    aircraft.holding_fix = {"x": found_wp["x"], "y": found_wp["y"]}
+            if altitude is not None:
+                aircraft.target_alt = float(altitude)
+            self.engine.event_buffer.append(
+                {
+                    "type": "ATC",
+                    "msg": f"HOLD: {callsign} holding",
+                    "timestamp": time.time(),
+                }
+            )
+
+        elif command == "DIRECT":
+            waypoint = cmd.get("waypoint")
+            if waypoint and self.engine.config:
+                search_term = waypoint.upper()
+                found_wp = None
+                for wp in self.engine.config.waypoints.values():
+                    if (
+                        wp.name and wp.name.upper() == search_term
+                    ) or wp.id.upper() == search_term:
+                        found_wp = wp.model_dump()
+                        break
+                if found_wp:
+                    aircraft.direct_to_wp = found_wp
+                    aircraft.state = "ENROUTE"
+                    self.engine.event_buffer.append(
+                        {
+                            "type": "ATC",
+                            "msg": f"DIRECT: {callsign} -> {waypoint}",
+                            "timestamp": time.time(),
+                        }
+                    )
+
+        elif command == "APPROACH":
+            aircraft.state = "APPROACH"
+            self.engine.event_buffer.append(
+                {
+                    "type": "ATC",
+                    "msg": f"APPROACH: {callsign} cleared approach",
+                    "timestamp": time.time(),
+                }
+            )
+
+        elif command == "LAND":
+            runway = cmd.get("runway")
+            if runway:
+                aircraft.target_runway_id = runway.upper()
+            aircraft.state = "LANDING"
+            self.engine.event_buffer.append(
+                {
+                    "type": "ATC",
+                    "msg": f"LAND: {callsign} cleared to land",
+                    "timestamp": time.time(),
+                }
+            )
+
+        elif command == "RESUME":
+            aircraft.state = "ENROUTE"
+            aircraft.direct_to_wp = None
+            self.engine.event_buffer.append(
+                {
+                    "type": "ATC",
+                    "msg": f"RESUME: {callsign} resuming navigation",
+                    "timestamp": time.time(),
+                }
+            )
+
+    def _build_observation(self) -> ATCObservation:
+        """
+        Build ATCObservation from current engine state.
+
+        Returns:
+            ATCObservation Pydantic model
+        """
+        # Build airport status
+        wind = Wind(
+            heading=int(self.engine.wind_heading) % 360,
+            speed=int(self.engine.wind_speed),
+        )
+
+        runway_occupancy = {}
+        for r_id, status in self.engine.runway_status.items():
+            runway_occupancy[r_id] = status.get("occupied_by")
+
+        airport_status = AirportStatus(
+            active_runways=list(self.engine.active_runways),
+            runway_occupancy=runway_occupancy,
+            wind=wind,
+        )
+
+        # Build aircraft observations
+        aircraft_list = []
+        for ac in self.engine.aircrafts.values():
+            ac_obs = self._build_aircraft_observation(ac)
+            aircraft_list.append(ac_obs)
+
+        # Build metrics
+        metrics = Metrics(
+            simulation_time=round(self.engine.simulation_time, 1),
+            planes_landed=0,  # Would need to track this separately
+            planes_active=len(self.engine.aircrafts),
+        )
+
+        return ATCObservation(
+            airport_status=airport_status,
+            aircraft=aircraft_list,
+            metrics=metrics,
+        )
+
+    def _build_aircraft_observation(self, ac) -> AircraftObservation:
+        """
+        Build AircraftObservation for a single aircraft.
+
+        Args:
+            ac: Aircraft object from the simulation engine
+
+        Returns:
+            AircraftObservation Pydantic model
+        """
+        import time
+
+        # Calculate position
+        distance = math.sqrt(ac.x**2 + ac.y**2)
+        if ac.x == 0 and ac.y == 0:
+            bearing = 0.0
+        else:
+            bearing = (90 - math.degrees(math.atan2(ac.y, ac.x))) % 360
+        segment_idx = round(bearing / 45) % 8
+        segment_name = SEGMENTS_LABELS[segment_idx]
+
+        position = Position(
+            segment=segment_name,
+            distance=round(distance, 2),
+            altitude=int(ac.altitude),
+            target_altitude=int(ac.target_alt),
+        )
+
+        # Build motion
+        motion = Motion(
+            heading=round(ac.heading, 1),
+            target_heading=round(ac.target_heading, 1),
+            speed=int(ac.speed),
+            target_speed=int(ac.target_speed),
+        )
+
+        # Build intent
+        dist_to_thresh = None
+        if ac.runway_threshold:
+            tx, ty = ac.runway_threshold["x"], ac.runway_threshold["y"]
+            dist_to_thresh = round(math.sqrt((tx - ac.x) ** 2 + (ty - ac.y) ** 2), 2)
+
+        next_wp = (
+            ac.active_star if hasattr(ac, "active_star") and ac.active_star else "None"
+        )
+        if hasattr(ac, "direct_to_wp") and ac.direct_to_wp:
+            next_wp = ac.direct_to_wp.get("name", "Direct")
+
+        intent = Intent(
+            state=ac.state,
+            assigned_runway=ac.target_runway_id,
+            distance_to_threshold=dist_to_thresh,
+            next_waypoint=next_wp,
+        )
+
+        # Build alerts
+        alerts = []
+        if hasattr(ac, "fuel_level") and ac.fuel_level < 10:
+            alerts.append("low_fuel")
+        if hasattr(ac, "emergency_index"):
+            if ac.emergency_index >= 1:
+                alerts.append("low_fuel")
+            if ac.emergency_index == 3:
+                alerts.append("critical_emergency")
+
+        # Calculate separation
+        closest_callsign = None
+        closest_dist = None
+        conflict_risk = "none"
+
+        aircraft_list = list(self.engine.aircrafts.values())
+        for other_ac in aircraft_list:
+            if other_ac.callsign == ac.callsign:
+                continue
+            dist_km = math.sqrt((ac.x - other_ac.x) ** 2 + (ac.y - other_ac.y) ** 2)
+            alt_diff = abs(ac.altitude - other_ac.altitude)
+
+            if closest_callsign is None or dist_km < closest_dist:
+                closest_callsign = other_ac.callsign
+                closest_dist = round(dist_km, 2)
+
+                # Determine conflict risk
+                if dist_km < 5.0 and alt_diff < 1500:
+                    conflict_risk = "high"
+                elif dist_km < 10.0 and alt_diff < 3000 and conflict_risk != "high":
+                    conflict_risk = "medium"
+
+        separation = Separation(
+            closest_traffic=closest_callsign,
+            distance=closest_dist,
+            conflict_risk=conflict_risk,
+        )
+
+        return AircraftObservation(
+            callsign=ac.callsign,
+            position=position,
+            motion=motion,
+            intent=intent,
+            alerts=alerts,
+            separation=separation,
+        )
+
+    def _check_terminal_conditions(self, observation: ATCObservation) -> bool:
+        """
+        Check if episode should terminate.
+
+        Args:
+            observation: Current ATCObservation
+
+        Returns:
+            True if episode should end, False otherwise
+        """
+        # Check if simulation engine already marked terminal
+        if self.engine.is_terminal:
+            return True
+
+        # Check collision (separation < 0.3km and alt diff < 300ft)
+        for ac in observation.aircraft:
+            for other in observation.aircraft:
+                if other.callsign == ac.callsign:
+                    continue
+                # Calculate actual distance
+                dist = self._calculate_distance(
+                    ac.position.distance,
+                    ac.position.segment,
+                    other.position.distance,
+                    other.position.segment,
+                )
+                alt_diff = abs(ac.position.altitude - other.position.altitude)
+                if dist < 0.3 and alt_diff < 300:
+                    return True
+
+        # Check fuel exhaustion
+        for ac in observation.aircraft:
+            if "critical_emergency" in ac.alerts:
+                return True
+
+        # Check airspace exit (if altitude goes negative or exceeds limit)
+        for ac in observation.aircraft:
+            if ac.position.altitude < 0 or ac.position.altitude > 45000:
+                return True
+
+        # Check if all aircraft have landed or exited
+        active_count = observation.metrics.planes_active
+        if active_count == 0 and self._initial_aircraft_count > 0:
+            return True
+
+        return False
+
+    def _calculate_distance(
+        self, dist1: float, seg1: str, dist2: float, seg2: str
+    ) -> float:
+        """
+        Calculate distance between two aircraft in km.
+
+        Args:
+            dist1: Distance of first aircraft from center
+            seg1: Segment of first aircraft
+            dist2: Distance of second aircraft from center
+            seg2: Segment of second aircraft
+
+        Returns:
+            Distance in km
+        """
+        x1, y1 = self._segment_to_xy(dist1, seg1)
+        x2, y2 = self._segment_to_xy(dist2, seg2)
+        return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+
+    def _segment_to_xy(self, distance: float, segment: str) -> tuple[float, float]:
+        """
+        Convert segment and distance to x, y coordinates.
+
+        Args:
+            distance: Distance from center in km
+            segment: Segment name (e.g., "North", "North-East")
+
+        Returns:
+            Tuple of (x, y) coordinates
+        """
+        segment_angles = {
+            "North": 0,
+            "North-East": 45,
+            "East": 90,
+            "South-East": 135,
+            "South": 180,
+            "South-West": 225,
+            "West": 270,
+            "North-West": 315,
+        }
+        angle = math.radians(segment_angles.get(segment, 0))
+        x = distance * math.cos(angle)
+        y = distance * math.sin(angle)
+        # Convert to standard coordinate system (East=+x, North=+y)
+        return x, y
+
+    def _get_terminal_event(self) -> Optional[str]:
+        """
+        Get the terminal event type that ended the episode.
+
+        Returns:
+            String describing terminal event or None
+        """
+        # Check recent events for crash/terminal indicators
+        for event in reversed(self.engine.event_buffer):
+            if event.get("type") == "CRASH":
+                return f"CRASH: {event.get('subtype', 'UNKNOWN')}"
+            elif event.get("type") == "SEPARATION_VIOLATION":
+                return "SEPARATION_VIOLATION"
+
+        if self.engine.is_terminal:
+            return "ENGINE_TERMINAL"
+
+        return "ALL_AIRCRAFT_HANDLED"
+
+    @property
+    def state(self) -> ATCState:
+        """
+        Return current episode metadata.
+
+        Returns:
+            ATCState Pydantic model
+        """
+        return ATCState(
+            episode_id=self.episode_id,
+            step_count=self.step_count,
+            task_name=self.task_name or "unknown",
+            cumulative_reward=round(self.cumulative_reward, 2),
+        )
+
+
+class PointDirect:
+    """Minimal Point-like object for airport config."""
+
+    def __init__(self, x: float, y: float):
+        self.x = x
+        self.y = y
+
+
+class WaypointDirect:
+    """Minimal Waypoint-like object for airport config."""
+
+    def __init__(self, wp_data: dict):
+        for key, value in wp_data.items():
+            setattr(self, key, value)
+        self._data = wp_data
+
+    def model_dump(self):
+        return self._data
+
+
+class RunwayDirect:
+    """Minimal Runway-like object for airport config."""
+
+    def __init__(self, runway_data: dict):
+        self.id = runway_data["id"]
+        self.heading = runway_data.get("heading", 0)
+        self.length_km = runway_data.get("length_km", 3.0)
+        self.start = (
+            PointDirect(**runway_data["start"])
+            if "start" in runway_data
+            else PointDirect(0, 0)
+        )
+        self.end = (
+            PointDirect(**runway_data["end"])
+            if "end" in runway_data
+            else PointDirect(0, 0)
+        )
+        self.iaf = PointDirect(**runway_data["iaf"]) if "iaf" in runway_data else None
+        self.altitude = runway_data.get("altitude", 0)
+        self.dp = runway_data.get("dp")
+        self.model_dump = lambda: runway_data
+
+
+class AirportConfigDirect:
+    """
+    Minimal AirportConfig-like object for direct JSON loading.
+
+    Provides the interface expected by engine.load_airport() without
+    requiring the full pydantic models from api.schemas.
+    """
+
+    def __init__(self, data: dict):
+        self.airport_code = data["airport_code"]
+        self.name = data.get("name", data["airport_code"])
+        self.gates = {
+            name: PointDirect(**pos) for name, pos in data.get("gates", {}).items()
+        }
+        self.terminal_gates = {
+            name: PointDirect(**pos)
+            for name, pos in data.get("terminal_gates", {}).items()
+        }
+        self.runways = [RunwayDirect(r) for r in data.get("runways", [])]
+        self.waypoints = {
+            k: WaypointDirect(v) for k, v in data.get("waypoints", {}).items()
+        }
+        self.stars = data.get("stars", {})
+        self.sids = data.get("sids", {})
+        self.time_scale = data.get("time_scale", 1.0)
+
+
+# Import time at module level for use in methods
+import time

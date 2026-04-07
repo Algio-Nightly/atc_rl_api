@@ -14,3 +14,28 @@ dependencies = [
     "torch>=2.11.0",
     "uvicorn>=0.43.0",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["api*", "core*", "rl_env*", "visualizer*", "airports*"]
+exclude = ["tests*", "scripts*"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.3.0",
+    "pytest-timeout>=2.4.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+timeout = 1200
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "llm: marks tests that require LLM API access",
+    "unit: marks tests as unit tests (fast, no external dependencies)",
+]
+testpaths = ["rl_env/tests"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]

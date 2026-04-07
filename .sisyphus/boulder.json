@@ -1,0 +1,22 @@
+{
+  "active_plan": "/Users/aban/drive/Projects/atc_rl_api/.sisyphus/plans/atc_rl_env_implementation.md",
+  "started_at": "2026-04-07T17:55:33.292Z",
+  "session_ids": [
+    "ses_298157f74ffe5XMol9VLKizUUO"
+  ],
+  "session_origins": {
+    "ses_298157f74ffe5XMol9VLKizUUO": "direct"
+  },
+  "plan_name": "atc_rl_env_implementation",
+  "agent": "atlas",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "**Create Pydantic Models**",
+      "session_id": "ses_2969dd78dffe2QrtkDjVgzj9sN",
+      "agent": "oracle",
+      "updated_at": "2026-04-07T19:20:31.725Z"
+    }
+  }
+}
