@@ -31,6 +31,7 @@
       "y": 0.0
     }
   },
+  "terminal_gates": {},
   "runways": [
     {
       "id": "RWY_1",
@@ -47,7 +48,8 @@
       "iaf": {
         "x": -10.93496163559706,
         "y": 0.6596920664474161
-      }
+      },
+      "dp": null
     },
     {
       "id": "RWY_1_REV",
@@ -64,7 +66,8 @@
       "iaf": {
         "x": 10.02559578268222,
         "y": 0.8525789284100387
-      }
+      },
+      "dp": null
     },
     {
       "id": "RWY_3",
@@ -81,7 +84,8 @@
       "iaf": {
         "x": -11.571849242872393,
         "y": -0.6763351712965756
-      }
+      },
+      "dp": null
     },
     {
       "id": "RWY_3_REV",
@@ -98,9 +102,291 @@
       "iaf": {
         "x": 10.951600071588175,
         "y": -0.6393408814529216
-      }
+      },
+      "dp": null
     }
   ],
-  "waypoints": {},
-  "stars": {}
+  "waypoints": {
+    "FAF_RWY_1": {
+      "id": "FAF_RWY_1",
+      "name": "FAF_RWY_1",
+      "x": -11.39874385180389,
+      "y": 0.6554241696289755,
+      "target_alt": 2000,
+      "target_speed": 180,
+      "is_iaf": false,
+      "is_faf": true,
+      "holding_stack": []
+    },
+    "IAF_RWY_1": {
+      "id": "IAF_RWY_1",
+      "name": "IAF_RWY_1",
+      "x": -22.39827812123241,
+      "y": 0.5542023554404776,
+      "target_alt": 4000,
+      "target_speed": 210,
+      "is_iaf": true,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "DP_RWY_1": {
+      "id": "DP_RWY_1",
+      "name": "DP",
+      "x": 26.48127924132628,
+      "y": 1.00401026110065,
+      "target_alt": 6000,
+      "target_speed": 250,
+      "is_iaf": false,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "FAF_RWY_1_REV": {
+      "id": "FAF_RWY_1_REV",
+      "name": "FAF_RWY_1_REV",
+      "x": 10.48195666761207,
+      "y": 0.8567785313719269,
+      "target_alt": 2000,
+      "target_speed": 180,
+      "is_iaf": false,
+      "is_faf": true,
+      "holding_stack": []
+    },
+    "IAF_RWY_1_REV": {
+      "id": "IAF_RWY_1_REV",
+      "name": "IAF_RWY_1_REV",
+      "x": 21.48149093704059,
+      "y": 0.9580003455604262,
+      "target_alt": 4000,
+      "target_speed": 210,
+      "is_iaf": true,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "DP_RWY_1_REV": {
+      "id": "DP_RWY_1_REV",
+      "name": "DP",
+      "x": -27.3980664255181,
+      "y": 0.5081924399002482,
+      "target_alt": 6000,
+      "target_speed": 250,
+      "is_iaf": false,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "FAF_RWY_3": {
+      "id": "FAF_RWY_3",
+      "name": "FAF_RWY_3",
+      "x": -11.19670520415249,
+      "y": -0.6757190051353567,
+      "target_alt": 2000,
+      "target_speed": 180,
+      "is_iaf": false,
+      "is_faf": true,
+      "holding_stack": []
+    },
+    "IAF_RWY_3": {
+      "id": "IAF_RWY_3",
+      "name": "IAF_RWY_3",
+      "x": -22.19669036662969,
+      "y": -0.6937862484645274,
+      "target_alt": 4000,
+      "target_speed": 210,
+      "is_iaf": true,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "DP_RWY_3": {
+      "id": "DP_RWY_3",
+      "name": "DP",
+      "x": 26.42872552645074,
+      "y": -0.6139200297427776,
+      "target_alt": 6000,
+      "target_speed": 250,
+      "is_iaf": false,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "FAF_RWY_3_REV": {
+      "id": "FAF_RWY_3_REV",
+      "name": "FAF_RWY_3_REV",
+      "x": 10.42874710830209,
+      "y": -0.6401996564033825,
+      "target_alt": 2000,
+      "target_speed": 180,
+      "is_iaf": false,
+      "is_faf": true,
+      "holding_stack": []
+    },
+    "IAF_RWY_3_REV": {
+      "id": "IAF_RWY_3_REV",
+      "name": "IAF_RWY_3_REV",
+      "x": 21.42873227077929,
+      "y": -0.6221324130742031,
+      "target_alt": 4000,
+      "target_speed": 210,
+      "is_iaf": true,
+      "is_faf": false,
+      "holding_stack": []
+    },
+    "DP_RWY_3_REV": {
+      "id": "DP_RWY_3_REV",
+      "name": "DP",
+      "x": -27.19668362230114,
+      "y": -0.7019986317959884,
+      "target_alt": 6000,
+      "target_speed": 250,
+      "is_iaf": false,
+      "is_faf": false,
+      "holding_stack": []
+    }
+  },
+  "stars": {
+    "N": {
+      "RWY_1": [
+        "IAF_RWY_1",
+        "FAF_RWY_1"
+      ],
+      "RWY_1_REV": [
+        "IAF_RWY_1_REV",
+        "FAF_RWY_1_REV"
+      ],
+      "RWY_3": [
+        "IAF_RWY_3",
+        "FAF_RWY_3"
+      ],
+      "RWY_3_REV": [
+        "IAF_RWY_3_REV",
+        "FAF_RWY_3_REV"
+      ]
+    },
+    "S": {
+      "RWY_1": [
+        "IAF_RWY_1",
+        "FAF_RWY_1"
+      ],
+      "RWY_1_REV": [
+        "IAF_RWY_1_REV",
+        "FAF_RWY_1_REV"
+      ],
+      "RWY_3": [
+        "IAF_RWY_3",
+        "FAF_RWY_3"
+      ],
+      "RWY_3_REV": [
+        "IAF_RWY_3_REV",
+        "FAF_RWY_3_REV"
+      ]
+    },
+    "E": {
+      "RWY_1": [
+        "IAF_RWY_1",
+        "FAF_RWY_1"
+      ],
+      "RWY_1_REV": [
+        "IAF_RWY_1_REV",
+        "FAF_RWY_1_REV"
+      ],
+      "RWY_3": [
+        "IAF_RWY_3",
+        "FAF_RWY_3"
+      ],
+      "RWY_3_REV": [
+        "IAF_RWY_3_REV",
+        "FAF_RWY_3_REV"
+      ]
+    },
+    "W": {
+      "RWY_1": [
+        "IAF_RWY_1",
+        "FAF_RWY_1"
+      ],
+      "RWY_1_REV": [
+        "IAF_RWY_1_REV",
+        "FAF_RWY_1_REV"
+      ],
+      "RWY_3": [
+        "IAF_RWY_3",
+        "FAF_RWY_3"
+      ],
+      "RWY_3_REV": [
+        "IAF_RWY_3_REV",
+        "FAF_RWY_3_REV"
+      ]
+    }
+  },
+  "sids": {
+    "RWY_1": {
+      "N": [
+        "DP_RWY_1",
+        "N"
+      ],
+      "S": [
+        "DP_RWY_1",
+        "S"
+      ],
+      "E": [
+        "DP_RWY_1",
+        "E"
+      ],
+      "W": [
+        "DP_RWY_1",
+        "W"
+      ]
+    },
+    "RWY_1_REV": {
+      "N": [
+        "DP_RWY_1_REV",
+        "N"
+      ],
+      "S": [
+        "DP_RWY_1_REV",
+        "S"
+      ],
+      "E": [
+        "DP_RWY_1_REV",
+        "E"
+      ],
+      "W": [
+        "DP_RWY_1_REV",
+        "W"
+      ]
+    },
+    "RWY_3": {
+      "N": [
+        "DP_RWY_3",
+        "N"
+      ],
+      "S": [
+        "DP_RWY_3",
+        "S"
+      ],
+      "E": [
+        "DP_RWY_3",
+        "E"
+      ],
+      "W": [
+        "DP_RWY_3",
+        "W"
+      ]
+    },
+    "RWY_3_REV": {
+      "N": [
+        "DP_RWY_3_REV",
+        "N"
+      ],
+      "S": [
+        "DP_RWY_3_REV",
+        "S"
+      ],
+      "E": [
+        "DP_RWY_3_REV",
+        "E"
+      ],
+      "W": [
+        "DP_RWY_3_REV",
+        "W"
+      ]
+    }
+  },
+  "time_scale": 1.0
 }

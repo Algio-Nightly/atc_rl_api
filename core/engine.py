@@ -20,6 +20,7 @@ class SimulationEngine:
         self.wind_speed = 10.0
         self.active_runways: list[str] = []
         self.runway_status: dict[str, dict] = {} # {id: {occupied_by: Optional[str]}}
+        self.runway_cooldowns: dict[str, float] = {} # {id: timestamp_until_free}
         
         self.event_buffer = []
 
@@ -34,6 +35,7 @@ class SimulationEngine:
         
         # Initialize runway status
         self.runway_status = {r.id: {"occupied_by": None} for r in self.config.runways}
+        self.runway_cooldowns = {r.id: 0.0 for r in self.config.runways}
         
         self.event_buffer.append({
             "type": "AIRPORT_LOADED", 
@@ -111,20 +113,18 @@ class SimulationEngine:
                             if wp_cfg:
                                 route.append(wp_cfg.model_dump())
                         
-                        # Add runway's internal IAF
-                        rw_cfg = next((r for r in self.config.runways if r.id == active_rw_id), None)
-                        if rw_cfg:
-                            iaf_wp = {"x": rw_cfg.iaf.x, "y": rw_cfg.iaf.y, "target_alt": 3000, "target_speed": 180, "name": f"IAF-{active_rw_id}"}
-                            route.append(iaf_wp)
-                        
                         gate_routes.append({"runway": active_rw_id, "waypoints": route})
                 if gate_routes:
                     stars[gate_id] = gate_routes
+        
+        # Build sids context (already in config.sids but can be processed here if needed)
+        sids = self.config.sids if self.config else {}
 
         context = {
             "wind_heading": self.wind_heading,
             "wind_speed": self.wind_speed,
             "stars": stars,
+            "sids": self.config.sids if self.config else {},
             "runway_status": self.runway_status,
             "all_waypoints": self.config.waypoints if self.config else {}
         }
@@ -134,15 +134,25 @@ class SimulationEngine:
             aircraft.update(dt, context)
             
             # Use assigned runway's threshold for landing detection
+            # SUCCESSFUL LANDING Detection
             if aircraft.state == "LANDING" and aircraft.speed < 10:
-                # SUCCESSFUL LANDING Sequence
                 self.event_buffer.append({"type": "SUCCESSFUL_LANDING", "callsign": callsign, "timestamp": time.time()})
-                
-                # Release the runway lock
                 if aircraft.target_runway_id in self.runway_status:
                     self.runway_status[aircraft.target_runway_id]["occupied_by"] = None
-                
+                    self.runway_cooldowns[aircraft.target_runway_id] = self.simulation_time + 60.0
                 to_delete.append(callsign)
+            
+            # SUCCESSFUL DEPARTURE Detection (45km Boundary)
+            if aircraft.state == "CLIMB_OUT":
+                dist_from_center = math.sqrt(aircraft.x**2 + aircraft.y**2)
+                if dist_from_center > 45.0:
+                    self.event_buffer.append({
+                        "type": "SUCCESSFUL_DEPARTURE", 
+                        "callsign": callsign, 
+                        "reward": 100, 
+                        "timestamp": time.time()
+                    })
+                    to_delete.append(callsign)
             
             if aircraft.state == "CRASHED" or aircraft.state == "CRASHED_RUNWAY_INCURSION":
                 self.is_terminal = True
@@ -215,6 +225,72 @@ class SimulationEngine:
         })
         return True
 
+    def spawn_departure(self, callsign: str, ac_type: str, runway_id: str, gate_id: str, terminal_gate_id: str = None):
+        """Spawns an aircraft on the ground for a SID departure."""
+        if not self.config: return None
+        
+        # Find runway config
+        rw_cfg = next((r for r in self.config.runways if r.id == runway_id), None)
+        if not rw_cfg: return None
+        
+        # Determine spawn point and state
+        start_p = rw_cfg.start
+        initial_state = "HOLDING_SHORT"
+        
+        if terminal_gate_id and terminal_gate_id in self.config.terminal_gates:
+            gate_p = self.config.terminal_gates[terminal_gate_id]
+            start_p = gate_p
+            initial_state = "ON_GATE"
+            
+        # Build SID route: Runway -> DP -> Gate
+        sid_wp_ids = self.config.sids.get(runway_id, {}).get(gate_id, [])
+        route = []
+        for wp_id in sid_wp_ids:
+            wp = self.config.waypoints.get(wp_id)
+            if wp: 
+                route.append(wp.model_dump())
+            elif wp_id in self.config.gates:
+                # Boundary gate is a "virtual waypoint"
+                gate_p = self.config.gates[wp_id]
+                route.append({
+                    "id": wp_id,
+                    "name": wp_id,
+                    "x": gate_p.x,
+                    "y": gate_p.y,
+                    "target_alt": 6000,
+                    "target_speed": 250
+                })
+        
+        # Create Aircraft
+        ac = Aircraft(
+            callsign=callsign.upper(),
+            type=ac_type,
+            weight_class="Heavy" if any(x in ac_type for x in ["74", "77", "78", "380"]) else "Medium",
+            position=(start_p.x, start_p.y),
+            altitude=0,
+            heading=rw_cfg.heading,
+            speed=0,
+            state=initial_state
+        )
+        
+        # Initialize departure state
+        ac.target_runway_id = runway_id
+        ac.runway_threshold = {"x": rw_cfg.start.x, "y": rw_cfg.start.y}
+        ac.runway_heading = rw_cfg.heading
+        ac.active_route = route
+        ac.route_index = 0
+        
+        self.aircrafts[callsign.upper()] = ac
+        
+        self.event_buffer.append({
+            "type": "SPAWN", 
+            "subtype": "DEPARTURE",
+            "callsign": callsign.upper(), 
+            "runway": runway_id, 
+            "timestamp": time.time()
+        })
+        return ac
+
     def update_weather(self, heading: float, speed: float):
         self.wind_heading = heading
         self.wind_speed = speed
@@ -258,6 +334,51 @@ class SimulationEngine:
         config_data = self.config.model_dump() if self.config else None
         anchor = config_data["anchor"] if config_data else None
         
+        # Calculate dynamic runway status for the UI
+        # 1. Start with base occupied_by from engine locks
+        display_runway_status = {}
+        for r_id, status in self.runway_status.items():
+            effective_status = {
+                "id": r_id,
+                "status": "CLEAR",
+                "occupied_by": status["occupied_by"],
+                "reserved_by": None,
+                "cooldown_remaining": max(0, round(self.runway_cooldowns.get(r_id, 0) - self.simulation_time, 1))
+            }
+            
+            # Priority 1: Physical Occupancy (Lock)
+            if status["occupied_by"]:
+                effective_status["status"] = "OCCUPIED"
+            # Priority 2: Cooldown
+            elif effective_status["cooldown_remaining"] > 0:
+                effective_status["status"] = "COOLDOWN"
+            # Priority 3: Reservations (Assignments)
+            else:
+                # Check for any aircraft that is actively using or approaching this runway
+                for ac in self.aircrafts.values():
+                    # 1. Skip if still at terminal (don't block runway yet)
+                    if ac.state == "ON_GATE":
+                        continue
+                        
+                    is_reserving = False
+                    # 2. Check if this is their target runway and they are in an active phase
+                    if ac.target_runway_id == r_id:
+                        # Arrivals in ENROUTE/HOLDING don't reserve yet
+                        # Departures in TAXIING/HOLDING_SHORT do reserve
+                        if ac.state in ["TAXIING", "HOLDING_SHORT", "APPROACH", "LANDING", "GO_AROUND"]:
+                            is_reserving = True
+                            
+                    # 3. Check for queued landings (explicitly cleared)
+                    if not is_reserving and ac.queued_landing and ac.queued_landing.get("runway_id") == r_id:
+                        is_reserving = True
+                        
+                    if is_reserving:
+                        effective_status["status"] = "RESERVED"
+                        effective_status["reserved_by"] = ac.callsign
+                        break
+            
+            display_runway_status[r_id] = effective_status
+
         state = {
             "simulation_time": round(self.simulation_time, 2),
             "is_terminal": self.is_terminal,
@@ -266,6 +387,7 @@ class SimulationEngine:
             "wind_speed": self.wind_speed,
             "time_scale": self.time_scale,
             "aircrafts": {c: a.get_state(anchor=anchor) for c, a in self.aircrafts.items()},
+            "runway_status": display_runway_status,
             "events": list(self.event_buffer),
             "config": config_data
         }

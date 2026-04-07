@@ -25,7 +25,46 @@ def load_airport_config(airport_code: str) -> Optional[AirportConfig]:
         return None
     with open(path, "r") as f:
         data = json.load(f)
-        return AirportConfig(**data)
+        
+        # --- MIGRATION BLOCK: Handle old configs missing DP or SIDs ---
+        # 1. Initialize sids if missing
+        if "sids" not in data:
+            data["sids"] = {}
+        if "terminal_gates" not in data:
+            data["terminal_gates"] = {}
+        
+        # 2. Check runways for missing dp or iaf
+        if "runways" in data:
+            # We create a temporary AirportConfig to use helper methods
+            # But the helper methods might need a full AirportConfig object.
+            # To avoid recursion, we'll do manual fixes if needed.
+            runways = data["runways"]
+            for rw in runways:
+                if "dp" not in rw or "iaf" not in rw:
+                    # If any fix is missing, we need to trigger the generator
+                    # But the generator needs the waypoints pool.
+                    pass # We'll handle this after the object is created for simplicity
+        
+        config = AirportConfig(**data)
+        
+        # --- Post-Init Migration ---
+        needs_save = False
+        for rw in config.runways:
+            if rw.dp is None or rw.iaf is None:
+                # Project missing fixes
+                _add_runway_fixes(config, rw.id, rw.start, rw.end, rw.heading)
+                needs_save = True
+        
+        # Ensure SIDs correspond to existing runways
+        for rw in config.runways:
+            if rw.id not in config.sids:
+                # This will be handled by _add_runway_fixes above, but good to double check
+                pass
+
+        if needs_save:
+            save_airport_config(config)
+            
+        return config
 
 def save_airport_config(config: AirportConfig):
     path = get_airport_path(config.airport_code)
@@ -52,6 +91,12 @@ def create_airport(req: AirportCreateRequest) -> AirportConfig:
             "E": Point(x=45.0, y=0),
             "W": Point(x=-45.0, y=0)
         },
+        terminal_gates={
+            "G1": Point(x=0.2, y=0.2),
+            "G2": Point(x=-0.2, y=0.2),
+            "G3": Point(x=0.2, y=-0.2),
+            "G4": Point(x=-0.2, y=-0.2)
+        },
         runways=[],
         stars={}
     )
@@ -61,9 +106,10 @@ def create_airport(req: AirportCreateRequest) -> AirportConfig:
 def list_all_airports() -> List[AirportConfig]:
     airports = []
     for f in AIRPORTS_DIR.glob("*.json"):
-        with open(f, "r") as json_file:
-            data = json.load(json_file)
-            airports.append(AirportConfig(**data))
+        code = f.stem
+        cfg = load_airport_config(code)
+        if cfg:
+            airports.append(cfg)
     return airports
 
 def geo_to_xy(lat: float, lon: float, anchor: LatLon) -> Point:
@@ -84,29 +130,49 @@ def xy_to_latLon_list(x: float, y: float, anchor: LatLon) -> list:
     lon = anchor.lon + (dx / (KM_PER_DEG_LAT * math.cos(math.radians(anchor.lat))))
     return [round(lat, 6), round(lon, 6)]
 
-def _add_approach_fixes(config: AirportConfig, rw_id: str, threshold: Point, heading: float) -> Point:
-    """Internal helper to project FAF (9km) and IAF (20km) along extended centerline"""
+def _add_runway_fixes(config, rw_id, start_p, end_p, heading):
+    """Internal helper to project IAF, FAF, and DP waypoints for a runway and projects SID/STARs."""
     rad = math.radians(heading)
     # Unit vector in direction of landing (HEADING 0 is North +Y, 90 is East +X)
     dx = math.sin(rad)
     dy = math.cos(rad)
     
-    # 1. Final Approach Fix (FAF) - 9km
-    faf_p = Point(x=threshold.x - dx * 9.0, y=threshold.y - dy * 9.0)
+    # 1. Approach Fixes (Backward from start_p)
+    # FAF (9km)
+    faf_p = Point(x=start_p.x - dx * 9.0, y=start_p.y - dy * 9.0)
     faf_id = f"FAF_{rw_id}"
     config.waypoints[faf_id] = WaypointConfig(
         id=faf_id, name=faf_id, x=faf_p.x, y=faf_p.y,
         target_alt=2000, target_speed=180, is_iaf=False, is_faf=True
     )
     
-    # 2. Initial Approach Fix (IAF) - 20km
-    iaf_p = Point(x=threshold.x - dx * 20.0, y=threshold.y - dy * 20.0)
+    # IAF (20km)
+    iaf_p = Point(x=start_p.x - dx * 20.0, y=start_p.y - dy * 20.0)
     iaf_id = f"IAF_{rw_id}"
     config.waypoints[iaf_id] = WaypointConfig(
         id=iaf_id, name=iaf_id, x=iaf_p.x, y=iaf_p.y,
         target_alt=4000, target_speed=210, is_iaf=True
     )
-    return iaf_p
+
+    # 2. Departure Fix (DP) - Forward from end_p 25km
+    dp_p = Point(x=end_p.x + dx * 25.0, y=end_p.y + dy * 25.0)
+    dp_id = f"DP_{rw_id}"
+    config.waypoints[dp_id] = WaypointConfig(
+        id=dp_id, name="DP", x=dp_p.x, y=dp_p.y,
+        target_alt=6000, target_speed=250
+    )
+    
+    # 3. Auto-generate STARs (Gate -> IAF -> FAF)
+    for gate_id in config.gates:
+        if gate_id not in config.stars: config.stars[gate_id] = {}
+        config.stars[gate_id][rw_id] = [iaf_id, faf_id]
+        
+    # 4. Auto-generate SIDs (DP -> Gate)
+    if rw_id not in config.sids: config.sids[rw_id] = {}
+    for gate_id in config.gates:
+        config.sids[rw_id][gate_id] = [dp_id, gate_id]
+
+    return iaf_p, dp_p
 
 def add_runway_from_geo(airport_code: str, start_latlon: list, end_latlon: list, bidirectional: bool = False) -> AirportConfig:
     # Find airport by code
@@ -125,8 +191,8 @@ def add_runway_from_geo(airport_code: str, start_latlon: list, end_latlon: list,
     heading = (90 - math.degrees(math.atan2(dy, dx))) % 360
     
     rw_id = f"RWY_{len(config.runways) + 1}"
-    # Automatically project FAF/IAF
-    iaf_point = _add_approach_fixes(config, rw_id, p1, heading)
+    # Automatically project FAF/IAF/DP
+    iaf_point, dp_point = _add_runway_fixes(config, rw_id, p1, p2, heading)
     
     new_runway = RunwayConfig(
         id=rw_id,
@@ -134,7 +200,8 @@ def add_runway_from_geo(airport_code: str, start_latlon: list, end_latlon: list,
         length_km=length,
         start=p1,
         end=p2,
-        iaf=iaf_point
+        iaf=iaf_point,
+        dp=dp_point
     )
     
     config.runways.append(new_runway)
@@ -143,8 +210,8 @@ def add_runway_from_geo(airport_code: str, start_latlon: list, end_latlon: list,
         # Create reverse runway (180 deg opposite)
         rev_id = f"{rw_id}_REV"
         rev_heading = (heading + 180) % 360
-        # Automatically project FAF/IAF for the reverse side (start of reverse is p2)
-        rev_iaf_point = _add_approach_fixes(config, rev_id, p2, rev_heading)
+        # Automatically project fixes for the reverse side (start=p2, end=p1)
+        rev_iaf_point, rev_dp_point = _add_runway_fixes(config, rev_id, p2, p1, rev_heading)
         
         config.runways.append(RunwayConfig(
             id=rev_id,
@@ -152,7 +219,8 @@ def add_runway_from_geo(airport_code: str, start_latlon: list, end_latlon: list,
             length_km=length,
             start=p2,
             end=p1,
-            iaf=rev_iaf_point
+            iaf=rev_iaf_point,
+            dp=rev_dp_point
         ))
         
     save_airport_config(config)

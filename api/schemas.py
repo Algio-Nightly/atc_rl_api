@@ -17,6 +17,9 @@ class ATCCommandID(str, Enum):
     ATC_HOLD = "ATC_HOLD"
     ATC_APPROACH = "ATC_APPROACH"
     ATC_LAND = "ATC_LAND"
+    ATC_LINE_UP = "ATC_LINE_UP"
+    ATC_TAKEOFF = "ATC_TAKEOFF"
+    ATC_TAXI = "ATC_TAXI"
 
 class PilotMessageType(str, Enum):
     REQUEST = "REQUEST"
@@ -42,7 +45,7 @@ class AircraftState(BaseModel):
     target_speed: int = Field(gt=0, le=600)
     
     # System Status
-    state: Literal["ENROUTE", "HOLDING", "APPROACH", "LANDING", "GO_AROUND", "TAXIING", "CRASHED"]
+    state: Literal["ENROUTE", "HOLDING", "APPROACH", "LANDING", "GO_AROUND", "HOLDING_SHORT", "LINE_UP", "TAKEOFF_ROLL", "CLIMB_OUT", "ON_GATE", "TAXIING", "CRASHED"]
     fuel_level: float = Field(ge=0.0, le=100.0)
     emergency_index: int = Field(default=0, ge=0, le=3, description="0=Normal, 1=Low Fuel, 3=Critical")
     
@@ -95,8 +98,10 @@ class SpawnRequest(BaseModel):
     gate: str
     altitude: int = 10000
     heading: float = 0
-    heading: float = 0
     speed: int = 250
+    is_departure: bool = False
+    runway_id: Optional[str] = None
+    terminal_gate_id: Optional[str] = None
 
 # --- Configuration Schemas ---
 
@@ -114,7 +119,8 @@ class RunwayConfig(BaseModel):
     length_km: float
     start: Point
     end: Point
-    iaf: Point
+    iaf: Optional[Point] = None
+    dp: Optional[Point] = None
 
 class WaypointConfig(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -134,11 +140,14 @@ class AirportConfig(BaseModel):
     bounds: Dict[str, float] = {"width_km": 100, "height_km": 100}
     center: Point = Point(x=25, y=25)
     gates: Dict[str, Point]
+    terminal_gates: Dict[str, Point] = {}
     runways: List[RunwayConfig] = []
     # Global pool of waypoints: ID -> Config
     waypoints: Dict[str, WaypointConfig] = {}
     # gate -> runway -> waypoint_ids
     stars: Dict[str, Dict[str, List[str]]] = {}
+    # runway -> gate -> waypoint_ids
+    sids: Dict[str, Dict[str, List[str]]] = {}
     time_scale: float = 1.0
 
 # --- Request Models ---
