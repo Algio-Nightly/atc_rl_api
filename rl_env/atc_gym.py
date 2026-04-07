@@ -50,6 +50,7 @@ class ATCEnv(Environment):
                            "South", "South-West", "West", "North-West"]
                            
         obs = {
+            "simulation_time": round(self.engine.simulation_time, 1),
             "aircraft": [],
             "airport_status": {
                 "active_runways": list(self.engine.active_runways),
@@ -80,6 +81,7 @@ class ATCEnv(Environment):
             closest_callsign = None
             closest_dist = float('inf')
             conflict_risk = "none"
+            closest_other = None
             
             for j, other_ac in enumerate(aircraft_list):
                 if i != j:
@@ -87,16 +89,38 @@ class ATCEnv(Environment):
                     if dist_km < closest_dist:
                         closest_dist = dist_km
                         closest_callsign = other_ac.callsign
+                        closest_other = other_ac
                         alt_diff = abs(ac.altitude - other_ac.altitude)
                         if dist_km < 5.0 and alt_diff < 1500:
                             conflict_risk = "high"
                         elif dist_km < 10.0 and alt_diff < 3000 and conflict_risk != "high":
                             conflict_risk = "medium"
 
-            if closest_dist == float('inf'):
-                closest_dist_val = None
-            else:
+            time_to_collision = "N/A"
+            if closest_dist != float('inf'):
                 closest_dist_val = round(closest_dist, 2)
+                # If high risk, calculate a time to impact based on relative velocities
+                if conflict_risk == "high" and closest_other and closest_dist > 0.01:
+                    # Convert heading to math radians, speed to km/h map
+                    h1 = math.radians(90 - ac.heading)
+                    h2 = math.radians(90 - closest_other.heading)
+                    v1x = (ac.speed * 1.852) * math.cos(h1)
+                    v1y = (ac.speed * 1.852) * math.sin(h1)
+                    v2x = (closest_other.speed * 1.852) * math.cos(h2)
+                    v2y = (closest_other.speed * 1.852) * math.sin(h2)
+                    
+                    dx = closest_other.x - ac.x
+                    dy = closest_other.y - ac.y
+                    dvx = v2x - v1x
+                    dvy = v2y - v1y
+                    
+                    # Positive closing speed means they are moving toward each other
+                    closing_speed = -(dx * dvx + dy * dvy) / closest_dist
+                    if closing_speed > 10.0:  # arbitrary 10 km/h threshold to avoid noisy zeros
+                        time_hrs = closest_dist / closing_speed
+                        time_to_collision = round(time_hrs * 60, 1) # minutes
+            else:
+                closest_dist_val = None
                 
             # Compute alerts
             alerts = []
@@ -107,9 +131,12 @@ class ATCEnv(Environment):
                 
             # Intent block additions
             dist_to_thresh = None
+            time_to_thresh = "N/A"
             if ac.runway_threshold:
                 tx, ty = ac.runway_threshold["x"], ac.runway_threshold["y"]
                 dist_to_thresh = round(math.sqrt((tx - ac.x)**2 + (ty - ac.y)**2), 2)
+                if ac.speed > 0:
+                    time_to_thresh = round((dist_to_thresh / (ac.speed * 1.852)) * 60, 1)
 
             next_wp = ac.active_star if ac.active_star else "None"
             if hasattr(ac, "direct_to_wp") and ac.direct_to_wp:
@@ -133,13 +160,15 @@ class ATCEnv(Environment):
                     "state": ac.state,
                     "assigned_runway": ac.target_runway_id,
                     "distance_to_threshold": dist_to_thresh,
+                    "time_to_threshold_min": time_to_thresh,
                     "next_waypoint": next_wp
                 },
                 "alerts": alerts,
                 "separation": {
                     "closest_traffic": closest_callsign,
                     "distance": closest_dist_val,
-                    "conflict_risk": conflict_risk
+                    "conflict_risk": conflict_risk,
+                    "time_to_collision_min": time_to_collision
                 }
             }
             obs["aircraft"].append(ac_obj)
