@@ -117,6 +117,7 @@ class RunwayConfig(BaseModel):
     id: str
     heading: float
     length_km: float
+    altitude: int = 0
     start: Point
     end: Point
     iaf: Optional[Point] = None
@@ -209,6 +210,7 @@ class SimSetAirportRequest(BaseModel):
 class RunwaySummary(BaseModel):
     id: str
     heading: float
+    altitude: int = 0
     start: List[float]
     end: List[float]
 
