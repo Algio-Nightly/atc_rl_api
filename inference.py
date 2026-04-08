@@ -99,7 +99,8 @@ def get_llm_response(client: OpenAI, prompt: str) -> str:
         )
         return (completion.choices[0].message.content or "").strip()
     except Exception as exc:
-        print(f"[DEBUG] LLM request failed: {exc}", flush=True)
+        # Keep stdout strictly to [START]/[STEP]/[END] for automated scoring.
+        print(f"[DEBUG] LLM request failed: {exc}", file=sys.stderr, flush=True)
         return ""
 
 
@@ -167,61 +168,70 @@ def run_episode(
     client: OpenAI,
     task_name: str,
 ) -> tuple[bool, int, float, list[float]]:
-    observation, _info = env.reset(task=task_name)
     rewards: list[float] = []
     steps_taken = 0
     success = False
+    score = 0.0
 
     log_start(task=task_name, env=BENCHMARK_NAME, model=MODEL_NAME)
 
     try:
-        for step_num in range(1, MAX_STEPS_PER_EPISODE + 1):
-            steps_taken = step_num
+        observation, _info = env.reset(task=task_name)
 
-            prompt = generate_atc_prompt(observation)
-            llm_text = get_llm_response(client, prompt)
-            commands, parse_error = build_commands_from_response(llm_text)
+        try:
+            for step_num in range(1, MAX_STEPS_PER_EPISODE + 1):
+                steps_taken = step_num
 
-            action = ATCAction(commands=commands)
-            action_str = "; ".join(commands) if commands else "NOOP"
+                prompt = generate_atc_prompt(observation)
+                llm_text = get_llm_response(client, prompt)
+                commands, parse_error = build_commands_from_response(llm_text)
 
-            try:
-                observation, reward, done, _truncated, _info = env.step(action)
-                rewards.append(reward)
+                action = ATCAction(commands=commands)
+                action_str = "; ".join(commands) if commands else "NOOP"
 
-                log_step(
-                    step=step_num,
-                    action=action_str,
-                    reward=reward,
-                    done=done,
-                    error=parse_error,
-                )
+                try:
+                    observation, reward, done, _truncated, _info = env.step(action)
+                    rewards.append(reward)
 
-                if done:
+                    log_step(
+                        step=step_num,
+                        action=action_str,
+                        reward=reward,
+                        done=done,
+                        error=parse_error,
+                    )
+
+                    if done:
+                        break
+
+                except Exception as exc:
+                    rewards.append(0.0)
+                    log_step(
+                        step=step_num,
+                        action=action_str,
+                        reward=0.0,
+                        done=True,
+                        error=f"step_error:{exc}",
+                    )
                     break
 
-            except Exception as exc:
-                rewards.append(0.0)
-                log_step(
-                    step=step_num,
-                    action=action_str,
-                    reward=0.0,
-                    done=True,
-                    error=f"step_error:{exc}",
-                )
-                break
+        except Exception as exc:
+            if steps_taken == 0:
+                steps_taken = 1
+            rewards.append(0.0)
+            log_step(
+                step=steps_taken,
+                action="ERROR",
+                reward=0.0,
+                done=True,
+                error=f"episode_error:{exc}",
+            )
 
-    except Exception as exc:
-        if steps_taken == 0:
-            steps_taken = 1
-        rewards.append(0.0)
-        log_step(
-            step=steps_taken,
-            action="ERROR",
-            reward=0.0,
-            done=True,
-            error=f"episode_error:{exc}",
-        )
+    finally:
+        try:
+            env.close()
+        except Exception:
+            pass
 
     score = normalize_score(sum(rewards), steps_taken)
     success = score >= SUCCESS_SCORE_THRESHOLD
@@ -237,7 +247,7 @@ def run_episode(
 
 def main() -> None:
     if not API_KEY:
-        print("ERROR: HF_TOKEN environment variable is required", flush=True)
+        print("ERROR: HF_TOKEN environment variable is required", file=sys.stderr, flush=True)
         sys.exit(1)
 
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
@@ -254,10 +264,11 @@ def main() -> None:
 
     avg_score = total_score / len(TASKS) if TASKS else 0.0
 
-    print(f"\n=== SUMMARY ===", flush=True)
-    print(f"Tasks completed: {successes}/{len(TASKS)}", flush=True)
-    print(f"Average score:   {avg_score:.2f}", flush=True)
-    print(f"Total score:     {total_score:.2f}", flush=True)
+    # Optional human-readable summary on stderr only (stdout stays [START]/[STEP]/[END] only).
+    print(f"\n=== SUMMARY ===", file=sys.stderr, flush=True)
+    print(f"Tasks completed: {successes}/{len(TASKS)}", file=sys.stderr, flush=True)
+    print(f"Average score:   {avg_score:.2f}", file=sys.stderr, flush=True)
+    print(f"Total score:     {total_score:.2f}", file=sys.stderr, flush=True)
 
 
 if __name__ == "__main__":
