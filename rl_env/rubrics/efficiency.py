@@ -117,17 +117,23 @@ class EfficiencyRubric(BaseRubric):
     def _check_holding_penalty(
         self, ac: "AircraftObservation", sim_time: float
     ) -> float:
-        if ac.intent.state == "HOLDING":
-            if ac.callsign not in self._holding_start_times:
-                self._holding_start_times[ac.callsign] = sim_time
-            else:
-                holding_duration = sim_time - self._holding_start_times[ac.callsign]
-                if holding_duration > self.THRESHOLD_HOLDING_TIME_MINUTES * 60:
-                    excess_minutes = (
-                        holding_duration - self.THRESHOLD_HOLDING_TIME_MINUTES * 60
-                    ) / 60
-                    return self.PENALTY_HOLDING_PER_MINUTE * excess_minutes
+        threshold_seconds = self.THRESHOLD_HOLDING_TIME_MINUTES * 60
+
+        if ac.timing_stats is not None:
+            holding_duration = ac.timing_stats.historical_times.get("HOLDING", 0.0)
+            if holding_duration > threshold_seconds:
+                excess_minutes = (holding_duration - threshold_seconds) / 60
+                return self.PENALTY_HOLDING_PER_MINUTE * excess_minutes
         else:
-            if ac.callsign in self._holding_start_times:
-                del self._holding_start_times[ac.callsign]
+            if ac.intent.state == "HOLDING":
+                if ac.callsign not in self._holding_start_times:
+                    self._holding_start_times[ac.callsign] = sim_time
+                else:
+                    holding_duration = sim_time - self._holding_start_times[ac.callsign]
+                    if holding_duration > threshold_seconds:
+                        excess_minutes = (holding_duration - threshold_seconds) / 60
+                        return self.PENALTY_HOLDING_PER_MINUTE * excess_minutes
+            else:
+                if ac.callsign in self._holding_start_times:
+                    del self._holding_start_times[ac.callsign]
         return 0.0
