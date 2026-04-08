@@ -123,7 +123,9 @@ class SafetyRubric(BaseRubric):
         self, ac: "AircraftObservation", all_aircraft: list["AircraftObservation"]
     ) -> float:
         sep = ac.separation
-        if sep.closest_traffic and sep.distance is not None:
+        if sep.distance is None:
+            return 0.0
+        if sep.closest_traffic:
             if sep.distance < self.THRESHOLD_SEP_VIOLATION_DIST_KM:
                 alt_diff = 0.0
                 for other in all_aircraft:
