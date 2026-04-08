@@ -114,6 +114,7 @@ class ATCEnv(Environment):
         self.episode_id = f"ep_{uuid.uuid4().hex[:8]}"
         self.step_count = 0
         self.cumulative_reward = 0.0
+        self.rubric = ATCRubric()
         self.command_history = {}
         self._previous_observation = None
 
@@ -128,17 +129,13 @@ class ATCEnv(Environment):
         # Spawn aircraft based on task
         self._spawn_aircraft_for_task(task_config)
 
-        # Get initial observation
         observation = self._build_observation()
+        info = {"episode_id": self.episode_id, "task_name": self.task_name}
+
         self._previous_observation = observation
         self._initial_aircraft_count = len(self.engine.aircrafts)
 
-        # Get initial telemetry
-        telemetry = self._get_step_telemetry()
-
-        # Meta OpenEnv Pivot: Return ONLY the raw JSON string
-        import json
-        return json.dumps(telemetry, indent=2)
+        return (observation, info)
 
     def _spawn_aircraft_for_task(self, task_config: dict) -> None:
         """
@@ -200,7 +197,7 @@ class ATCEnv(Environment):
 
         return AirportConfigDirect(data)
 
-    def step(self, action: ATCAction) -> str:
+    def step(self, action: ATCAction) -> tuple[ATCObservation, float, bool, bool, dict]:
         """
         Execute one step of the simulation.
 
@@ -212,49 +209,57 @@ class ATCEnv(Environment):
         """
         self.step_count += 1
 
-        # Parse and execute commands
         self._execute_commands(action)
 
-        # Advance simulation by one step (1 second in sim time)
         self.engine.step(1.0)
 
-        # Extract telemetry before flushing
-        telemetry = self._get_step_telemetry()
+        observation = self._build_observation()
 
-        # Build raw JSON string
-        import json
-        telemetry_json = json.dumps(telemetry, indent=2)
+        reward = self.rubric.forward(action, observation)
+        reward = max(-100.0, min(100.0, reward))
+        self.cumulative_reward += reward
 
-        # Flush step-specific metrics
+        done = self._check_terminal_conditions(observation)
+        truncated = False
+
+        info = {
+            "episode_id": self.episode_id,
+            "step_count": self.step_count,
+            "task_name": self.task_name,
+            "cumulative_reward": self.cumulative_reward,
+        }
+
         self._flush_aircraft_metrics()
+        self._previous_observation = observation
 
-        self.step_count += 1
-
-        # Meta OpenEnv Pivot: Return ONLY the raw JSON string
-        return telemetry_json
+        return (observation, reward, done, truncated, info)
 
     def _get_step_telemetry(self) -> dict:
         """
         Construct the step telemetry payload for all active aircraft.
-        
+
         Returns:
             Dictionary containing 'step_telemetry'
         """
         aircraft_metrics = []
-        
+
         for ac in self.engine.aircrafts.values():
             # Calculate severity index
             severity_index = 1.0
             if ac.is_emergency:
                 # Hard-capped Base-2 formula to prevent overflow and ensure predictable scaling
                 severity_index = min(2.0 ** (ac.emergency_timer / 10.0), 1000.0)
-            
+
             # Current state time
             current_state_time = ac.historical_state_times.get(ac.state, 0.0)
-            
+
             # Historical times (excluding current state for the dict)
-            historical = {s: round(t, 1) for s, t in ac.historical_state_times.items() if s != ac.state}
-            
+            historical = {
+                s: round(t, 1)
+                for s, t in ac.historical_state_times.items()
+                if s != ac.state
+            }
+
             ac_metrics = {
                 "callsign": ac.callsign,
                 "current_state": ac.state,
@@ -262,16 +267,18 @@ class ATCEnv(Environment):
                 "timing_stats": {
                     "total_time_active_sec": round(ac.total_time_active, 1),
                     "time_in_current_state_sec": round(current_state_time, 1),
-                    "historical_times": historical
+                    "historical_times": historical,
                 },
                 "safety_metrics": {
                     "separation_warnings_triggered": ac.separation_warnings,
-                    "closest_proximity_km": ac.closest_proximity_km if ac.closest_proximity_km != 999.0 else None
+                    "closest_proximity_km": ac.closest_proximity_km
+                    if ac.closest_proximity_km != 999.0
+                    else None,
                 },
-                "command_rejections": list(ac.command_rejections)
+                "command_rejections": list(ac.command_rejections),
             }
             aircraft_metrics.append(ac_metrics)
-            
+
         return {"step_telemetry": {"aircraft_metrics": aircraft_metrics}}
 
     def _flush_aircraft_metrics(self) -> None:
@@ -447,13 +454,15 @@ class ATCEnv(Environment):
             runway = cmd.get("runway")
             if runway and self.engine.config:
                 rw_id = runway.upper()
-                target_rw = next((r for r in self.engine.config.runways if r.id == rw_id), None)
+                target_rw = next(
+                    (r for r in self.engine.config.runways if r.id == rw_id), None
+                )
                 if target_rw:
                     aircraft.target_runway_id = rw_id
                     aircraft.queued_landing = {
                         "runway_id": rw_id,
                         "threshold": {"x": target_rw.start.x, "y": target_rw.start.y},
-                        "runway_heading": target_rw.heading
+                        "runway_heading": target_rw.heading,
                     }
                     aircraft.state = "LANDING"
                     self.engine.event_buffer.append(
@@ -472,14 +481,19 @@ class ATCEnv(Environment):
             if aircraft.state != "ON_GATE":
                 reject("Must be ON_GATE to taxi")
                 return
-            
+
             runway = cmd.get("runway")
             if runway and self.engine.config:
                 rw_id = runway.upper()
-                target_rw = next((r for r in self.engine.config.runways if r.id == rw_id), None)
+                target_rw = next(
+                    (r for r in self.engine.config.runways if r.id == rw_id), None
+                )
                 if target_rw:
                     aircraft.target_runway_id = rw_id
-                    aircraft.runway_threshold = {"x": target_rw.start.x, "y": target_rw.start.y}
+                    aircraft.runway_threshold = {
+                        "x": target_rw.start.x,
+                        "y": target_rw.start.y,
+                    }
                     aircraft.runway_heading = target_rw.heading
                     aircraft.state = "TAXIING"
                     self.engine.event_buffer.append(
@@ -499,7 +513,9 @@ class ATCEnv(Environment):
                 reject("No runway assigned")
                 return
             aircraft.state = "LINE_UP"
-            self.engine.runway_status[aircraft.target_runway_id]["occupied_by"] = callsign
+            self.engine.runway_status[aircraft.target_runway_id]["occupied_by"] = (
+                callsign
+            )
             self.engine.event_buffer.append(
                 {
                     "type": "ATC",
@@ -510,17 +526,37 @@ class ATCEnv(Environment):
 
         elif command == "TAKEOFF":
             if aircraft.state == "TAXIING":
-                 aircraft.queued_takeoff = True
-                 self.engine.event_buffer.append({"type": "ATC", "msg": f"QUEUED TAKEOFF: {callsign}", "timestamp": time.time()})
+                aircraft.queued_takeoff = True
+                self.engine.event_buffer.append(
+                    {
+                        "type": "ATC",
+                        "msg": f"QUEUED TAKEOFF: {callsign}",
+                        "timestamp": time.time(),
+                    }
+                )
             elif aircraft.state == "HOLDING_SHORT":
                 aircraft.state = "LINE_UP"
                 aircraft.line_up_timer = 30.0
                 if aircraft.target_runway_id:
-                    self.engine.runway_status[aircraft.target_runway_id]["occupied_by"] = callsign
-                self.engine.event_buffer.append({"type": "ATC", "msg": f"CLEARED TAKEOFF: {callsign} (Aligning)", "timestamp": time.time()})
+                    self.engine.runway_status[aircraft.target_runway_id][
+                        "occupied_by"
+                    ] = callsign
+                self.engine.event_buffer.append(
+                    {
+                        "type": "ATC",
+                        "msg": f"CLEARED TAKEOFF: {callsign} (Aligning)",
+                        "timestamp": time.time(),
+                    }
+                )
             elif aircraft.state == "LINE_UP":
                 aircraft.state = "TAKEOFF_ROLL"
-                self.engine.event_buffer.append({"type": "ATC", "msg": f"CLEARED TAKEOFF: {callsign}", "timestamp": time.time()})
+                self.engine.event_buffer.append(
+                    {
+                        "type": "ATC",
+                        "msg": f"CLEARED TAKEOFF: {callsign}",
+                        "timestamp": time.time(),
+                    }
+                )
             else:
                 reject(f"Cannot takeoff from state {aircraft.state}")
 
