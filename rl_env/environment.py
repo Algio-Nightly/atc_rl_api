@@ -19,6 +19,8 @@ from rl_env.models import (
     AirportStatus,
     Metrics,
     Wind,
+    TimingStats,
+    SafetyMetrics,
 )
 from rl_env.rubrics import ATCRubric
 from rl_env.parsers import parse, ParseError
@@ -233,53 +235,6 @@ class ATCEnv(Environment):
         self._previous_observation = observation
 
         return (observation, reward, done, truncated, info)
-
-    def _get_step_telemetry(self) -> dict:
-        """
-        Construct the step telemetry payload for all active aircraft.
-
-        Returns:
-            Dictionary containing 'step_telemetry'
-        """
-        aircraft_metrics = []
-
-        for ac in self.engine.aircrafts.values():
-            # Calculate severity index
-            severity_index = 1.0
-            if ac.is_emergency:
-                # Hard-capped Base-2 formula to prevent overflow and ensure predictable scaling
-                severity_index = min(2.0 ** (ac.emergency_timer / 10.0), 1000.0)
-
-            # Current state time
-            current_state_time = ac.historical_state_times.get(ac.state, 0.0)
-
-            # Historical times (excluding current state for the dict)
-            historical = {
-                s: round(t, 1)
-                for s, t in ac.historical_state_times.items()
-                if s != ac.state
-            }
-
-            ac_metrics = {
-                "callsign": ac.callsign,
-                "current_state": ac.state,
-                "severity_index": round(severity_index, 2),
-                "timing_stats": {
-                    "total_time_active_sec": round(ac.total_time_active, 1),
-                    "time_in_current_state_sec": round(current_state_time, 1),
-                    "historical_times": historical,
-                },
-                "safety_metrics": {
-                    "separation_warnings_triggered": ac.separation_warnings,
-                    "closest_proximity_km": ac.closest_proximity_km
-                    if ac.closest_proximity_km != 999.0
-                    else None,
-                },
-                "command_rejections": list(ac.command_rejections),
-            }
-            aircraft_metrics.append(ac_metrics)
-
-        return {"step_telemetry": {"aircraft_metrics": aircraft_metrics}}
 
     def _flush_aircraft_metrics(self) -> None:
         """
@@ -706,6 +661,32 @@ class ATCEnv(Environment):
             conflict_risk=conflict_risk,
         )
 
+        severity_index = 1.0
+        if ac.is_emergency:
+            severity_index = round(min(2.0 ** (ac.emergency_timer / 10.0), 1000.0), 2)
+
+        current_state_time = ac.historical_state_times.get(ac.state, 0.0)
+        historical = {
+            s: round(t, 1)
+            for s, t in ac.historical_state_times.items()
+            if s != ac.state
+        }
+
+        timing_stats = TimingStats(
+            total_time_active_sec=round(ac.total_time_active, 1),
+            time_in_current_state_sec=round(current_state_time, 1),
+            historical_times=historical,
+        )
+
+        safety_metrics = SafetyMetrics(
+            separation_warnings_triggered=ac.separation_warnings,
+            closest_proximity_km=ac.closest_proximity_km
+            if ac.closest_proximity_km != 999.0
+            else None,
+        )
+
+        command_rejections = list(ac.command_rejections)
+
         return AircraftObservation(
             callsign=ac.callsign,
             position=position,
@@ -713,6 +694,10 @@ class ATCEnv(Environment):
             intent=intent,
             alerts=alerts,
             separation=separation,
+            timing_stats=timing_stats,
+            safety_metrics=safety_metrics,
+            command_rejections=command_rejections,
+            severity_index=severity_index,
         )
 
     def _check_terminal_conditions(self, observation: ATCObservation) -> bool:
