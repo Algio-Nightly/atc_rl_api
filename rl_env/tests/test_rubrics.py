@@ -12,6 +12,8 @@ from rl_env.models import (
     AirportStatus,
     Metrics,
     Wind,
+    TimingStats,
+    SafetyMetrics,
 )
 from rl_env.rubrics import (
     BaseRubric,
@@ -22,6 +24,7 @@ from rl_env.rubrics import (
     ATCRubric,
     FormatRubric,
 )
+from rl_env.rubrics.departure import DepartureRubric
 
 
 def create_sample_observation(
@@ -76,6 +79,16 @@ def create_sample_observation(
                     distance=traffic_distance,
                     conflict_risk=conflict_risk,
                 ),
+                timing_stats=TimingStats(
+                    total_time_active_sec=10.0,
+                    time_in_current_state_sec=5.0,
+                    historical_times={"ENROUTE": 10.0},
+                ),
+                safety_metrics=SafetyMetrics(
+                    separation_warnings_triggered=0, closest_proximity_km=5.0
+                ),
+                command_rejections=[],
+                severity_index=1.0,
             )
         ],
         metrics=Metrics(
@@ -295,3 +308,50 @@ class TestRubricComposition:
 
         assert scaled.weight == 2.0
         assert scaled.forward(action, obs) == 2.0 * rubric.forward(action, obs)
+
+
+class TestDepartureRubric:
+    def test_departure_rubric_importable(self):
+        d = DepartureRubric()
+        assert d is not None
+
+    def test_departure_rubric_forward(self):
+        d = DepartureRubric()
+        obs = create_sample_observation()
+        reward = d.forward(ATCAction(commands=[]), obs)
+        assert isinstance(reward, float)
+
+
+class TestRubricsWithEvents:
+    def test_safety_rubric_with_events(self):
+        rubric = SafetyRubric()
+        obs = create_sample_observation()
+        events = [{"type": "CRASH", "callsign": "AAL123", "timestamp": 0.0}]
+        reward = rubric.forward(ATCAction(commands=[]), obs, events=events)
+        assert isinstance(reward, float)
+
+    def test_efficiency_rubric_with_events(self):
+        rubric = EfficiencyRubric()
+        obs = create_sample_observation()
+        events = [
+            {"type": "SUCCESSFUL_LANDING", "callsign": "AAL123", "timestamp": 0.0}
+        ]
+        reward = rubric.forward(ATCAction(commands=[]), obs, events=events)
+        assert isinstance(reward, float)
+
+    def test_compliance_rubric_with_events(self):
+        rubric = ComplianceRubric()
+        obs = create_sample_observation()
+        events = [{"type": "COMMAND_ERROR", "callsign": "AAL123", "timestamp": 0.0}]
+        reward = rubric.forward(ATCAction(commands=[]), obs, events=events)
+        assert isinstance(reward, float)
+
+    def test_atcrubric_with_events(self):
+        rubric = ATCRubric()
+        obs = create_sample_observation()
+        events = [
+            {"type": "SUCCESSFUL_LANDING", "callsign": "AAL123", "timestamp": 0.0}
+        ]
+        reward = rubric.forward(ATCAction(commands=[]), obs, events=events)
+        assert isinstance(reward, float)
+        assert hasattr(rubric, "_last_rewards")

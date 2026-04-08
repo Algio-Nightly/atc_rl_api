@@ -21,8 +21,8 @@ class TestATCEnvImport:
 
 class TestATCEnvInit:
     def test_init_default_airport(self):
-        env = ATCEnv()
-        assert env.airport_code == "HEAT"
+        env = ATCEnv(airport_code="VOCB")
+        assert env.airport_code == "VOCB"
         assert env.engine is None
         assert env.episode_id is None
         assert env.step_count == 0
@@ -35,7 +35,7 @@ class TestATCEnvInit:
 
 class TestATCEnvReset:
     def test_reset_single_approach(self):
-        env = ATCEnv()
+        env = ATCEnv(airport_code="VOCB")
         obs, info = env.reset(task="single_approach")
         assert isinstance(obs, ATCObservation)
         assert "episode_id" in info
@@ -45,20 +45,20 @@ class TestATCEnvReset:
         assert env.cumulative_reward == 0.0
 
     def test_reset_traffic_pattern(self):
-        env = ATCEnv()
+        env = ATCEnv(airport_code="VOCB")
         obs, info = env.reset(task="traffic_pattern")
         assert isinstance(obs, ATCObservation)
         assert info["task_name"] == "traffic_pattern"
 
     def test_reset_with_seed(self):
-        env = ATCEnv()
+        env = ATCEnv(airport_code="VOCB")
         obs1, _ = env.reset(seed=42, task="single_approach")
-        env2 = ATCEnv()
+        env2 = ATCEnv(airport_code="VOCB")
         obs2, _ = env2.reset(seed=42, task="single_approach")
         assert env.episode_id != env2.episode_id
 
     def test_reset_spawns_aircraft(self):
-        env = ATCEnv()
+        env = ATCEnv(airport_code="VOCB")
         obs, info = env.reset(task="single_approach")
         assert len(obs.aircraft) >= 1
         assert obs.metrics.planes_active >= 1
@@ -66,7 +66,7 @@ class TestATCEnvReset:
 
 class TestATCEnvStep:
     def test_step_empty_action(self):
-        env = ATCEnv()
+        env = ATCEnv(airport_code="VOCB")
         env.reset(task="single_approach")
         action = ATCAction(commands=[])
         obs, reward, done, truncated, info = env.step(action)
@@ -78,7 +78,7 @@ class TestATCEnvStep:
         assert env.step_count == 1
 
     def test_step_with_vector_command(self):
-        env = ATCEnv()
+        env = ATCEnv(airport_code="VOCB")
         env.reset(task="single_approach")
         callsign = list(env.engine.aircrafts.keys())[0]
         action = ATCAction(commands=[f"ATC VECTOR {callsign} 270"])
@@ -87,7 +87,7 @@ class TestATCEnvStep:
         assert env.step_count == 1
 
     def test_step_with_altitude_command(self):
-        env = ATCEnv()
+        env = ATCEnv(airport_code="VOCB")
         env.reset(task="single_approach")
         callsign = list(env.engine.aircrafts.keys())[0]
         action = ATCAction(commands=[f"ATC ALTITUDE {callsign} 5000"])
@@ -95,7 +95,7 @@ class TestATCEnvStep:
         assert isinstance(obs, ATCObservation)
 
     def test_step_with_speed_command(self):
-        env = ATCEnv()
+        env = ATCEnv(airport_code="VOCB")
         env.reset(task="single_approach")
         callsign = list(env.engine.aircrafts.keys())[0]
         action = ATCAction(commands=[f"ATC SPEED {callsign} 220"])
@@ -103,7 +103,7 @@ class TestATCEnvStep:
         assert isinstance(obs, ATCObservation)
 
     def test_step_updates_cumulative_reward(self):
-        env = ATCEnv()
+        env = ATCEnv(airport_code="VOCB")
         env.reset(task="single_approach")
         initial_reward = env.cumulative_reward
         action = ATCAction(commands=[])
@@ -111,7 +111,7 @@ class TestATCEnvStep:
         assert env.cumulative_reward == initial_reward + reward
 
     def test_step_increments_step_count(self):
-        env = ATCEnv()
+        env = ATCEnv(airport_code="VOCB")
         env.reset(task="single_approach")
         assert env.step_count == 0
         action = ATCAction(commands=[])
@@ -123,7 +123,7 @@ class TestATCEnvStep:
 
 class TestATCEnvState:
     def test_state_property(self):
-        env = ATCEnv()
+        env = ATCEnv(airport_code="VOCB")
         env.reset(task="single_approach")
         state = env.state
         assert isinstance(state, ATCState)
@@ -133,7 +133,7 @@ class TestATCEnvState:
         assert state.cumulative_reward == env.cumulative_reward
 
     def test_state_after_steps(self):
-        env = ATCEnv()
+        env = ATCEnv(airport_code="VOCB")
         env.reset(task="single_approach")
         action = ATCAction(commands=[])
         for _ in range(5):
@@ -145,7 +145,7 @@ class TestATCEnvState:
 
 class TestATCEnvObservationStructure:
     def test_observation_has_required_fields(self):
-        env = ATCEnv()
+        env = ATCEnv(airport_code="VOCB")
         env.reset(task="single_approach")
         obs = env._build_observation()
         assert hasattr(obs, "airport_status")
@@ -153,7 +153,7 @@ class TestATCEnvObservationStructure:
         assert hasattr(obs, "metrics")
 
     def test_observation_airport_status(self):
-        env = ATCEnv()
+        env = ATCEnv(airport_code="VOCB")
         env.reset(task="single_approach")
         obs = env._build_observation()
         assert hasattr(obs.airport_status, "active_runways")
@@ -161,7 +161,7 @@ class TestATCEnvObservationStructure:
         assert hasattr(obs.airport_status, "wind")
 
     def test_observation_aircraft_fields(self):
-        env = ATCEnv()
+        env = ATCEnv(airport_code="VOCB")
         env.reset(task="single_approach")
         obs = env._build_observation()
         if len(obs.aircraft) > 0:
@@ -174,7 +174,7 @@ class TestATCEnvObservationStructure:
             assert hasattr(ac, "separation")
 
     def test_observation_metrics(self):
-        env = ATCEnv()
+        env = ATCEnv(airport_code="VOCB")
         env.reset(task="single_approach")
         obs = env._build_observation()
         assert hasattr(obs.metrics, "simulation_time")
@@ -212,14 +212,14 @@ class TestATCStateModel:
 
 class TestATCEnvTerminalConditions:
     def test_done_false_initially(self):
-        env = ATCEnv()
+        env = ATCEnv(airport_code="VOCB")
         env.reset(task="single_approach")
         action = ATCAction(commands=[])
         _, _, done, _, _ = env.step(action)
         assert done is False
 
     def test_info_contains_episode_metadata(self):
-        env = ATCEnv()
+        env = ATCEnv(airport_code="VOCB")
         env.reset(task="single_approach")
         action = ATCAction(commands=[])
         _, _, _, _, info = env.step(action)
@@ -227,3 +227,75 @@ class TestATCEnvTerminalConditions:
         assert "step_count" in info
         assert "task_name" in info
         assert "cumulative_reward" in info
+
+
+class TestATCEnvStepReturnTypes:
+    def test_step_returns_five_tuple(self):
+        env = ATCEnv(airport_code="VOCB")
+        env.reset(task="single_approach")
+        result = env.step(ATCAction(commands=[]))
+        assert isinstance(result, tuple)
+        assert len(result) == 5
+        obs, reward, done, truncated, info = result
+        assert isinstance(obs, ATCObservation)
+        assert isinstance(reward, float)
+        assert isinstance(done, bool)
+        assert isinstance(truncated, bool)
+        assert isinstance(info, dict)
+
+    def test_reset_returns_two_tuple(self):
+        env = ATCEnv(airport_code="VOCB")
+        result = env.reset(task="single_approach")
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        obs, info = result
+        assert isinstance(obs, ATCObservation)
+        assert isinstance(info, dict)
+
+    def test_step_info_contains_events(self):
+        env = ATCEnv(airport_code="VOCB")
+        env.reset(task="single_approach")
+        _, _, _, _, info = env.step(ATCAction(commands=[]))
+        assert "events" in info
+        assert isinstance(info["events"], list)
+
+    def test_step_info_contains_reward_breakdown(self):
+        env = ATCEnv(airport_code="VOCB")
+        env.reset(task="single_approach")
+        _, _, _, _, info = env.step(ATCAction(commands=[]))
+        assert "reward_breakdown" in info
+        assert isinstance(info["reward_breakdown"], dict)
+        assert "safety" in info["reward_breakdown"]
+        assert "efficiency" in info["reward_breakdown"]
+
+    def test_step_count_increments_by_one(self):
+        env = ATCEnv(airport_code="VOCB")
+        env.reset(task="single_approach")
+        assert env.step_count == 0
+        env.step(ATCAction(commands=[]))
+        assert env.step_count == 1
+        env.step(ATCAction(commands=[]))
+        assert env.step_count == 2
+
+    def test_rubric_resets_between_episodes(self):
+        env = ATCEnv(airport_code="VOCB")
+        env.reset(task="single_approach")
+        env.step(ATCAction(commands=[]))
+        env.reset(task="single_approach")
+        assert env.step_count == 0
+        assert env.cumulative_reward == 0.0
+
+    def test_observation_has_telemetry_fields(self):
+        env = ATCEnv(airport_code="VOCB")
+        obs, _ = env.reset(task="single_approach")
+        ac = obs.aircraft[0]
+        assert hasattr(ac, "timing_stats")
+        assert hasattr(ac, "safety_metrics")
+        assert hasattr(ac, "command_rejections")
+        assert hasattr(ac, "severity_index")
+
+    def test_departure_task_config_exists(self):
+        env = ATCEnv(airport_code="VOCB")
+        obs, info = env.reset(task="single_departure")
+        assert len(obs.aircraft) >= 1
+        assert info["task_name"] == "single_departure"

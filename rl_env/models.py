@@ -33,8 +33,8 @@ class Motion(BaseModel):
     target_heading: float = Field(
         ge=0, lt=360, description="Target heading in degrees (0-359)"
     )
-    speed: int = Field(gt=0, le=600, description="Current speed in knots")
-    target_speed: int = Field(gt=0, le=600, description="Target speed in knots")
+    speed: int = Field(ge=0, le=600, description="Current speed in knots")
+    target_speed: int = Field(ge=0, le=600, description="Target speed in knots")
 
     @classmethod
     def example(cls) -> "Motion":
