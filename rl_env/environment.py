@@ -1028,6 +1028,7 @@ class AirportConfigDirect:
     """
 
     def __init__(self, data: dict):
+        self._data = data
         self.airport_code = data["airport_code"]
         self.name = data.get("name", data["airport_code"])
         self.gates = {
@@ -1044,6 +1045,9 @@ class AirportConfigDirect:
         self.stars = data.get("stars", {})
         self.sids = data.get("sids", {})
         self.time_scale = data.get("time_scale", 1.0)
+
+    def model_dump(self):
+        return self._data
 
 
 # Import time at module level for use in methods
