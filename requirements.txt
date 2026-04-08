@@ -1,8 +1,5 @@
 fastapi
 uvicorn
-pygame
 pydantic
-torch
 openenv-core
-numpy
 requests
