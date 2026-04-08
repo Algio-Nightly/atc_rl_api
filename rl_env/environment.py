@@ -90,7 +90,7 @@ SEGMENTS_LABELS = [
 ]
 
 # Default airport code
-DEFAULT_AIRPORT = "HEAT"
+DEFAULT_AIRPORT = "VOCB"
 
 
 class ATCEnv(Environment):
