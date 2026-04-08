@@ -235,3 +235,15 @@ body {
   box-shadow: 0 0 15px rgba(255, 255, 255, 0.9) !important;
   z-index: 1000;
 }
+/* Radar Intel Styles */
+.intel-toggle { width: 100%; margin-top: 12px; background: #f0f7ff; border: 1px dashed #007bff; color: #007bff; padding: 8px; font-size: 0.8rem; font-weight: bold; cursor: pointer; border-radius: 4px; }
+.intel-toggle:hover { background: #e1efff; }
+.intel-section { margin-top: 12px; padding-top: 12px; border-top: 2px solid #eee; background: #fffcf0; padding: 12px; border-radius: 4px; border: 1px solid #ffeeba; }
+.intel-header { font-size: 0.85rem; font-weight: bold; color: #856404; margin-bottom: 8px; display: flex; justify-content: space-between; }
+.severity-gauge-container { height: 8px; background: #e9ecef; border-radius: 4px; overflow: hidden; margin-bottom: 12px; }
+.severity-gauge-fill { height: 100%; transition: width 0.3s ease, background-color 0.3s ease; }
+.rejection-log { font-size: 0.75rem; background: #fff; border: 1px solid #ddd; padding: 6px; max-height: 80px; overflow-y: auto; border-radius: 2px; }
+.rejection-item { color: #c82333; margin-bottom: 2px; border-left: 2px solid #dc3545; padding-left: 5px; }
+.proximity-warning { color: #dc3545; font-weight: bold; font-size: 0.8rem; }
+.pulse-red { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); animation: pulse-red-effect 1.5s infinite; border-radius: 50%; }
+@keyframes pulse-red-effect { 0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(220, 53, 69, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); } }

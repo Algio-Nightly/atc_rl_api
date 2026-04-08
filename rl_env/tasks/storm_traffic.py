@@ -39,11 +39,33 @@ class StormTrafficTask(Task):
 
     def setup(self, env: "ATCEnv") -> None:
         """Configure environment for storm traffic task."""
-        env.reset(task="storm_traffic")
+        env.reset(task="storm_traffic", skip_spawn=True)
         self._last_wind_change_time = 0.0
         self._next_wind_change_interval = self._get_next_wind_change_interval()
         self._emergency_landed_count = 0
+        upwind_gates = env._select_upwind_gates()
+        gates = upwind_gates if upwind_gates else ["N", "S", "E", "W"]
+        ac_types = ["B737", "A320", "B777", "E190", "A350"]
+        weight_classes = ["Heavy", "Medium", "Light", "Heavy", "Medium"]
+        for i in range(10):
+            gate = gates[i % len(gates)]
+            ac_type = ac_types[i % len(ac_types)]
+            weight_class = weight_classes[i % len(weight_classes)]
+            payload = {
+                "callsign": f"RL{i + 1:03d}",
+                "ac_type": ac_type,
+                "weight_class": weight_class,
+                "gate": gate,
+                "altitude": min(8000 + i * 1000, 15000),
+                "heading": None,
+                "speed": 250,
+            }
+            env.add_pending_spawn(
+                spawn_time=i * 15.0, method="add_aircraft", payload=payload
+            )
         self._setup_emergency_aircraft(env)
+        env._initial_aircraft_count = 10
+        env._previous_observation = env._build_observation()
 
     def _get_next_wind_change_interval(self) -> float:
         """Get random interval until next wind change."""

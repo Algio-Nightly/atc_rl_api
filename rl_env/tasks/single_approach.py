@@ -29,7 +29,20 @@ class SingleApproachTask(Task):
 
     def setup(self, env: "ATCEnv") -> None:
         """Configure environment for single approach task."""
-        env.reset(task="single_approach")
+        env.reset(task="single_approach", skip_spawn=True)
+        upwind_gates = env._select_upwind_gates()
+        gate = upwind_gates[0] if upwind_gates else "N"
+        env.engine.add_aircraft(
+            callsign="RL001",
+            ac_type="B737",
+            weight_class="Heavy",
+            gate=gate,
+            altitude=8000,
+            heading=None,
+            speed=250,
+        )
+        env._initial_aircraft_count = len(env.engine.aircrafts)
+        env._previous_observation = env._build_observation()
 
     def grade(self, env: "ATCEnv") -> float:
         """

@@ -21,6 +21,9 @@ SUPPORTED_COMMANDS = {
     "APPROACH",
     "LAND",
     "RESUME",
+    "TAXI",
+    "LINE_UP",
+    "TAKEOFF",
 }
 
 
@@ -119,8 +122,8 @@ def _parse_single_line(line: str, original_input: str) -> dict:
             raw_input=original_input,
         )
 
-    # VECTOR, ALTITUDE, SPEED, DIRECT, LAND require callsign + parameter
-    if command in ("VECTOR", "ALTITUDE", "SPEED", "DIRECT", "LAND"):
+    # VECTOR, ALTITUDE, SPEED, DIRECT, LAND, TAXI require callsign + parameter
+    if command in ("VECTOR", "ALTITUDE", "SPEED", "DIRECT", "LAND", "TAXI"):
         if len(parts) < 3:
             raise ParseError(
                 f"'{command}' command requires callsign and value. Format: ATC {command} <CALLSIGN> <VALUE>",
@@ -147,8 +150,23 @@ def _parse_single_line(line: str, original_input: str) -> dict:
         elif command == "SPEED":
             result["speed"] = _parse_number(value, "speed", original_input)
         elif command == "DIRECT":
-            result["waypoint"] = value
+            # Accept both forms:
+            # - ATC DIRECT <CALLSIGN> <WAYPOINT>
+            # - ATC DIRECT <CALLSIGN> TO <WAYPOINT>
+            if value == "TO":
+                waypoint = parts[4] if len(parts) > 4 else None
+                if waypoint is None:
+                    raise ParseError(
+                        "'DIRECT' command with TO requires a waypoint. "
+                        "Format: ATC DIRECT <CALLSIGN> TO <WAYPOINT>",
+                        raw_input=original_input,
+                    )
+                result["waypoint"] = waypoint
+            else:
+                result["waypoint"] = value
         elif command == "LAND":
+            result["runway"] = value
+        elif command == "TAXI":
             result["runway"] = value
 
         return result
@@ -176,8 +194,8 @@ def _parse_single_line(line: str, original_input: str) -> dict:
 
         return result
 
-    # APPROACH and RESUME commands: only require callsign
-    elif command in ("APPROACH", "RESUME"):
+    # APPROACH, RESUME, LINE_UP, and TAKEOFF commands: only require callsign
+    elif command in ("APPROACH", "RESUME", "LINE_UP", "TAKEOFF"):
         if len(parts) < 3:
             raise ParseError(
                 f"'{command}' command requires callsign. Format: ATC {command} <CALLSIGN>",

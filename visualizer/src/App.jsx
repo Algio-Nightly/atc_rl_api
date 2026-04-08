@@ -115,7 +115,7 @@ function App() {
             
             // 2. Accumulate Logs (Independent State)
             if (incomingData.events && incomingData.events.length > 0) {
-              setLogs(prevLogs => [...prevLogs, ...incomingData.events].slice(-100));
+              setLogs(prevLogs => [...prevLogs, ...incomingData.events].slice(-500));
             }
           }
         } catch (err) {

@@ -33,8 +33,8 @@ class Motion(BaseModel):
     target_heading: float = Field(
         ge=0, lt=360, description="Target heading in degrees (0-359)"
     )
-    speed: int = Field(gt=0, le=600, description="Current speed in knots")
-    target_speed: int = Field(gt=0, le=600, description="Target speed in knots")
+    speed: int = Field(ge=0, le=600, description="Current speed in knots")
+    target_speed: int = Field(ge=0, le=600, description="Target speed in knots")
 
     @classmethod
     def example(cls) -> "Motion":
@@ -77,6 +77,39 @@ class Separation(BaseModel):
         return cls(closest_traffic="UAL456", distance=5.2, conflict_risk="medium")
 
 
+class TimingStats(BaseModel):
+    total_time_active_sec: float = Field(
+        ge=0, description="Total time aircraft has been active in seconds"
+    )
+    time_in_current_state_sec: float = Field(
+        ge=0, description="Time spent in current intent state in seconds"
+    )
+    historical_times: dict[str, float] = Field(
+        default_factory=dict, description="Historical times for each intent state"
+    )
+
+    @classmethod
+    def example(cls) -> "TimingStats":
+        return cls(
+            total_time_active_sec=125.5,
+            time_in_current_state_sec=32.0,
+            historical_times={"ENROUTE": 45.0, "HOLDING": 30.0, "APPROACH": 18.5},
+        )
+
+
+class SafetyMetrics(BaseModel):
+    separation_warnings_triggered: int = Field(
+        ge=0, description="Number of separation warnings triggered"
+    )
+    closest_proximity_km: Optional[float] = Field(
+        default=None, ge=0, description="Closest proximity to any aircraft in km"
+    )
+
+    @classmethod
+    def example(cls) -> "SafetyMetrics":
+        return cls(separation_warnings_triggered=2, closest_proximity_km=3.5)
+
+
 class AirportStatus(BaseModel):
     active_runways: list[str] = Field(
         default_factory=list, description="List of active runway IDs"
@@ -105,6 +138,18 @@ class AircraftObservation(BaseModel):
         default_factory=list, description="Active alerts: low_fuel, critical_emergency"
     )
     separation: Separation
+    timing_stats: Optional[TimingStats] = Field(
+        default=None, description="Timing and state duration metrics"
+    )
+    safety_metrics: Optional[SafetyMetrics] = Field(
+        default=None, description="Safety-related metrics"
+    )
+    command_rejections: list[str] = Field(
+        default_factory=list, description="List of command rejections"
+    )
+    severity_index: float = Field(
+        default=1.0, ge=1.0, description="Severity index for emergency or conflicts"
+    )
 
     @classmethod
     def example(cls) -> "AircraftObservation":
@@ -115,6 +160,10 @@ class AircraftObservation(BaseModel):
             intent=Intent.example(),
             alerts=["low_fuel"],
             separation=Separation.example(),
+            timing_stats=TimingStats.example(),
+            safety_metrics=SafetyMetrics.example(),
+            command_rejections=["SPEED command rejected: below minimum"],
+            severity_index=1.0,
         )
 
 

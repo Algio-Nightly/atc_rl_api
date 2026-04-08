@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapContainer, TileLayer, Marker, Polyline, Circle, CircleMarker, Popup, useMapEvents, Tooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Polyline, Circle, CircleMarker, Popup, useMap, useMapEvents, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import { xyToLatLon, latLonToXY, MAP_CENTER } from '../utils/geo';
 import 'leaflet/dist/leaflet.css';
@@ -25,7 +25,7 @@ const createPlaneIcon = (heading, isSelected, scale = 1) => {
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2]
   });
-  
+
   planeIconCache[key] = icon;
   return icon;
 };
@@ -134,6 +134,46 @@ export default function RadarMap({
   const [toastKey, setToastKey] = React.useState(0);
   const [currentZoom, setCurrentZoom] = React.useState(13);
   const hoverTimer = React.useRef(null);
+  const mapAnchor = React.useMemo(() => {
+    if (activeAirportConfig?.anchor) {
+      return {
+        lat: activeAirportConfig.anchor.lat,
+        lon: activeAirportConfig.anchor.lon
+      };
+    }
+    return { lat: activeAirport.lat, lon: activeAirport.lon };
+  }, [activeAirportConfig, activeAirport]);
+
+  function RecenterMap({ center }) {
+    const map = useMapEvents({});
+    React.useEffect(() => {
+      map.setView(center, map.getZoom(), { animate: false });
+    }, [map, center]);
+    return null;
+  }
+
+  function AutoFitOnSpawn({ flights, anchor }) {
+    const map = useMap();
+    const previousFlightCountRef = React.useRef(flights.length);
+
+    React.useEffect(() => {
+      const previousCount = previousFlightCountRef.current;
+      const currentCount = flights.length;
+
+      if (currentCount > previousCount && currentCount > 0) {
+        const positions = flights.map((flight) =>
+          xyToLatLon(flight.x, flight.y, anchor)
+        );
+        const bounds = L.latLngBounds(positions);
+        bounds.extend([anchor.lat, anchor.lon]);
+        map.fitBounds(bounds.pad(0.25), { animate: true, duration: 0.5, maxZoom: 12 });
+      }
+
+      previousFlightCountRef.current = currentCount;
+    }, [flights, anchor, map]);
+
+    return null;
+  }
 
   React.useEffect(() => {
     if (clickedInfo) {
@@ -177,7 +217,7 @@ export default function RadarMap({
         }
 
         if (draftingMode === 'waypoint') {
-          const { x, y } = latLonToXY(lat, lng, activeAirport);
+          const { x, y } = latLonToXY(lat, lng, mapAnchor);
           sendWSMessage('create_waypoint', {
             airport_code: activeAirport.airport_code,
             x: x,
@@ -187,7 +227,7 @@ export default function RadarMap({
           return;
         }
 
-        const { x, y } = latLonToXY(lat, lng, activeAirport);
+        const { x, y } = latLonToXY(lat, lng, mapAnchor);
         setClickedInfo({ lat, lng, x, y });
         setToastKey(k => k + 1);
       },
@@ -214,7 +254,9 @@ export default function RadarMap({
   return (
     <div className="map-panel">
 
-      <MapContainer center={[activeAirport.lat, activeAirport.lon]} zoom={11} style={{ height: '100%', width: '100%' }}>
+      <MapContainer center={[mapAnchor.lat, mapAnchor.lon]} zoom={11} style={{ height: '100%', width: '100%' }}>
+        <RecenterMap center={[mapAnchor.lat, mapAnchor.lon]} />
+        <AutoFitOnSpawn flights={flights} anchor={mapAnchor} />
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; OpenStreetMap contributors'
@@ -224,7 +266,7 @@ export default function RadarMap({
         {[10000, 20000, 30000, 45000].map(r => (
           <Circle
             key={`ring-${r}`}
-            center={[activeAirport.lat, activeAirport.lon]}
+            center={[mapAnchor.lat, mapAnchor.lon]}
             radius={r}
             pathOptions={{
               color: r === 45000 ? '#007bff' : '#ccc',
@@ -246,7 +288,7 @@ export default function RadarMap({
           "EAST": [45, 0],
           "WEST": [-45, 0]
         }).map(([name, xy]) => {
-          const pos = xyToLatLon(xy[0], xy[1], { lat: activeAirport.lat, lon: activeAirport.lon });
+          const pos = xyToLatLon(xy[0], xy[1], mapAnchor);
           const color = GATE_COLORS[name] || '#888';
           return (
             <CircleMarker
@@ -271,7 +313,7 @@ export default function RadarMap({
         {/* Render Waypoint Pool */}
         {activeAirportConfig && activeAirportConfig.waypoints && (
           Object.values(activeAirportConfig.waypoints).map((wp) => {
-            const pos = xyToLatLon(wp.x, wp.y, activeAirport);
+            const pos = xyToLatLon(wp.x, wp.y, mapAnchor);
             const isIAF = wp.is_iaf || wp.name?.includes("IAF");
             const isFAF = wp.is_faf || wp.name?.includes("FAF");
             const isDP = wp.name?.includes("DP");
@@ -323,7 +365,7 @@ export default function RadarMap({
               const positions = (waypointIds || [])
                 .map(id => activeAirportConfig.waypoints[id])
                 .filter(Boolean)
-                .map(wp => xyToLatLon(wp.x, wp.y, activeAirport));
+                .map(wp => xyToLatLon(wp.x, wp.y, mapAnchor));
 
               // Draw the Route Line
               return positions.length > 1 ? (
@@ -348,7 +390,7 @@ export default function RadarMap({
               const positions = (waypointIds || [])
                 .map(id => activeAirportConfig.waypoints[id])
                 .filter(Boolean)
-                .map(wp => xyToLatLon(wp.x, wp.y, activeAirport));
+                .map(wp => xyToLatLon(wp.x, wp.y, mapAnchor));
 
               return positions.length > 1 ? (
                 <Polyline
@@ -370,7 +412,7 @@ export default function RadarMap({
             positions={starDraft.sequence
               .map(id => activeAirportConfig.waypoints[id])
               .filter(Boolean)
-              .map(wp => xyToLatLon(wp.x, wp.y, activeAirport))
+              .map(wp => xyToLatLon(wp.x, wp.y, mapAnchor))
             }
             color={GATE_COLORS[starDraft.gate.toUpperCase()] || '#007bff'}
             weight={4}
@@ -385,7 +427,7 @@ export default function RadarMap({
             positions={sidDraft.sequence
               .map(id => activeAirportConfig.waypoints[id])
               .filter(Boolean)
-              .map(wp => xyToLatLon(wp.x, wp.y, activeAirport))
+              .map(wp => xyToLatLon(wp.x, wp.y, mapAnchor))
             }
             color={GATE_COLORS[sidDraft.gate.toUpperCase()] || '#38a169'}
             weight={4}
@@ -483,14 +525,14 @@ export default function RadarMap({
 
         {/* Flights */}
         {flights.map((flight) => {
-          const pos = xyToLatLon(flight.x, flight.y, { lat: activeAirport.lat, lon: activeAirport.lon });
+          const pos = xyToLatLon(flight.x, flight.y, mapAnchor);
           const isSelected = selectedFlight && selectedFlight.callsign === flight.callsign;
           const planeScale = Math.max(0.8, 1 * zoomScale);
           return (
             <React.Fragment key={flight.callsign}>
               {/* Plot plane history */}
               {flight.history && (
-                <Polyline positions={flight.history.map(h => xyToLatLon(h[0], h[1], { lat: activeAirport.lat, lon: activeAirport.lon }))} color="gray" weight={2 * zoomScale} opacity={0.6} />
+                <Polyline positions={flight.history.map(h => xyToLatLon(h[0], h[1], mapAnchor))} color="gray" weight={2 * zoomScale} opacity={0.6} />
               )}
 
               {/* If selected, highlight with a circle marker */}

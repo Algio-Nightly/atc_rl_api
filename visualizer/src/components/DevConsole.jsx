@@ -26,6 +26,7 @@ export default function DevConsole({ actions, onSendCommand }) {
     if (typeof act === 'string') return act;
     const type = act.type || "INFO";
     const body = act.msg || act.message || JSON.stringify(act);
+    const preview = typeof body === 'string' && body.length > 240 ? `${body.slice(0, 240)}…` : body;
     
     // Custom formatting for specific types
     if (type === "SPAWN") return `[SPAWN] ${act.callsign} (${act.weight_class} ${act.ac_type}) entered airspace`;
@@ -38,6 +39,12 @@ export default function DevConsole({ actions, onSendCommand }) {
     if (type === "ATC") return `[ATC] ${body}`;
     if (type === "ERROR") return `[ERROR] !! ${body} !!`;
     if (type === "INFO" && body.startsWith("CMD:")) return `[SIM] ${body.replace("CMD: ", "")}`;
+    if (type === "RL_TASK") return `[RL] ${act.phase || 'step'} task=${act.task} model=${act.model} step=${act.step}`;
+    if (type === "RL_PROMPT") return `[PROMPT] ${preview}`;
+    if (type === "RL_RESPONSE") return `[MODEL] ${preview}`;
+    if (type === "RL_ACTION") return `[ACTION] ${act.action}`;
+    if (type === "RL_REWARD") return `[REWARD] step=${act.step} reward=${act.reward} cumulative=${act.cumulative_reward} done=${act.done}`;
+    if (type === "RL_ERROR") return `[RL ERROR] ${body}`;
     
     return `[${type}] ${body}`;
   };
@@ -62,12 +69,15 @@ export default function DevConsole({ actions, onSendCommand }) {
           const timestamp = act.timestamp 
             ? new Date(act.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})
             : new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+          const eventType = act?.type || "INFO";
+          const eventBody = act?.msg || act?.message || "";
+          const eventKey = `${act?.timestamp ?? "no-ts"}-${eventType}-${eventBody}-${i}`;
             
           const isError = act.type === "ERROR";
           const isATC = act.type === "ATC";
           
           return (
-            <div key={act.timestamp || i} style={{ 
+            <div key={eventKey} style={{ 
               marginBottom: '4px', 
               borderLeft: `2px solid ${isError ? '#ff0000' : isATC ? '#007bff' : '#004400'}`, 
               paddingLeft: '8px',

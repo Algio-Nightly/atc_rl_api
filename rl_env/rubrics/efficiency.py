@@ -31,7 +31,12 @@ class EfficiencyRubric(BaseRubric):
         self._prev_waypoints: dict[str, str] = {}
         self._holding_start_times: dict[str, float] = {}
 
-    def forward(self, action: "ATCAction", observation: "ATCObservation") -> float:
+    def forward(
+        self,
+        action: "ATCAction",
+        observation: "ATCObservation",
+        events: list[dict] | None = None,
+    ) -> float:
         total_reward = 0.0
 
         aircraft_list = observation.aircraft
@@ -39,7 +44,7 @@ class EfficiencyRubric(BaseRubric):
 
         for ac in aircraft_list:
             reward = self._compute_aircraft_efficiency(
-                ac, aircraft_list, observation, sim_time
+                ac, aircraft_list, observation, sim_time, events
             )
             total_reward += reward
 
@@ -60,10 +65,11 @@ class EfficiencyRubric(BaseRubric):
         all_aircraft: list["AircraftObservation"],
         observation: "ATCObservation",
         sim_time: float,
+        events: list[dict] | None = None,
     ) -> float:
         reward = 0.0
 
-        reward += self._check_landing_success(ac)
+        reward += self._check_landing_success(ac, events)
 
         reward += self._check_star_completion(ac)
 
@@ -77,7 +83,17 @@ class EfficiencyRubric(BaseRubric):
 
         return reward
 
-    def _check_landing_success(self, ac: "AircraftObservation") -> float:
+    def _check_landing_success(
+        self, ac: "AircraftObservation", events: list[dict] | None = None
+    ) -> float:
+        if events:
+            for event in events:
+                if (
+                    event.get("type") == "SUCCESSFUL_LANDING"
+                    and event.get("callsign") == ac.callsign
+                ):
+                    return self.REWARD_LANDING_SUCCESS
+
         prev_state = self._prev_states.get(ac.callsign, "")
         if ac.intent.state == "LANDING" and prev_state == "APPROACH":
             if ac.position.altitude < 100 and ac.position.distance < 0.2:
@@ -117,17 +133,23 @@ class EfficiencyRubric(BaseRubric):
     def _check_holding_penalty(
         self, ac: "AircraftObservation", sim_time: float
     ) -> float:
-        if ac.intent.state == "HOLDING":
-            if ac.callsign not in self._holding_start_times:
-                self._holding_start_times[ac.callsign] = sim_time
-            else:
-                holding_duration = sim_time - self._holding_start_times[ac.callsign]
-                if holding_duration > self.THRESHOLD_HOLDING_TIME_MINUTES * 60:
-                    excess_minutes = (
-                        holding_duration - self.THRESHOLD_HOLDING_TIME_MINUTES * 60
-                    ) / 60
-                    return self.PENALTY_HOLDING_PER_MINUTE * excess_minutes
+        threshold_seconds = self.THRESHOLD_HOLDING_TIME_MINUTES * 60
+
+        if ac.timing_stats is not None:
+            holding_duration = ac.timing_stats.historical_times.get("HOLDING", 0.0)
+            if holding_duration > threshold_seconds:
+                excess_minutes = (holding_duration - threshold_seconds) / 60
+                return self.PENALTY_HOLDING_PER_MINUTE * excess_minutes
         else:
-            if ac.callsign in self._holding_start_times:
-                del self._holding_start_times[ac.callsign]
+            if ac.intent.state == "HOLDING":
+                if ac.callsign not in self._holding_start_times:
+                    self._holding_start_times[ac.callsign] = sim_time
+                else:
+                    holding_duration = sim_time - self._holding_start_times[ac.callsign]
+                    if holding_duration > threshold_seconds:
+                        excess_minutes = (holding_duration - threshold_seconds) / 60
+                        return self.PENALTY_HOLDING_PER_MINUTE * excess_minutes
+            else:
+                if ac.callsign in self._holding_start_times:
+                    del self._holding_start_times[ac.callsign]
         return 0.0

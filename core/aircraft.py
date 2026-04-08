@@ -63,16 +63,32 @@ class Aircraft:
 
         self.line_up_timer = 0.0
         
-        # Queued Landing State (Delayed Landing)
+        # Queued States
         self.queued_landing = None # {runway_id, threshold, heading}
+        self.queued_takeoff = False
 
         # Manual Overrides (Persistent until Resume or Approach)
         self.manual_target_alt = None
         self.manual_target_speed = None
 
+        # Telemetry & Metrics Tracking
+        self.total_time_active = 0.0
+        self.historical_state_times = {} # {state: time_in_seconds}
+        self.separation_warnings = 0
+        self.closest_proximity_km = 999.0
+        self.command_rejections = [] # List of strings
+        self.emergency_timer = 0.0
+        self.is_emergency = (emergency_index > 0)
+
     def update(self, dt: float, engine_context: dict = None):
         """Update physics kinematics for the given time step dt"""
         
+        # Update metrics
+        self.total_time_active += dt
+        self.historical_state_times[self.state] = self.historical_state_times.get(self.state, 0.0) + dt
+        if self.is_emergency:
+            self.emergency_timer += dt
+
         if engine_context:
             stars = engine_context.get("stars", {})
             
@@ -87,7 +103,16 @@ class Aircraft:
                 dx, dy = self.runway_threshold["x"] - self.x, self.runway_threshold["y"] - self.y
                 self.target_heading = (90 - math.degrees(math.atan2(dy, dx))) % 360
                 if math.sqrt(dx**2 + dy**2) < 0.1:
-                    self.state = "HOLDING_SHORT"
+                    if self.queued_takeoff:
+                        self.state = "LINE_UP"
+                        self.line_up_timer = 30.0
+                        self.queued_takeoff = False
+                        # Update engine runway status if available
+                        runway_status = engine_context.get("runway_status", {})
+                        if self.target_runway_id in runway_status:
+                            runway_status[self.target_runway_id]["occupied_by"] = self.callsign
+                    else:
+                        self.state = "HOLDING_SHORT"
 
             elif self.state == "HOLDING_SHORT":
                 self.target_speed = 0
@@ -95,6 +120,15 @@ class Aircraft:
                 if self.runway_threshold:
                     self.x, self.y = self.runway_threshold["x"], self.runway_threshold["y"]
                 self.heading = self.target_heading = self.runway_heading
+                
+                # Auto-transition if takeoff is queued while holding short
+                if self.queued_takeoff:
+                    self.state = "LINE_UP"
+                    self.line_up_timer = 30.0
+                    self.queued_takeoff = False
+                    runway_status = engine_context.get("runway_status", {})
+                    if self.target_runway_id in runway_status:
+                        runway_status[self.target_runway_id]["occupied_by"] = self.callsign
                 
             elif self.state == "LINE_UP" and self.runway_threshold:
                 self.target_speed = 0
@@ -243,6 +277,7 @@ class Aircraft:
         self.fuel_level = max(0.0, self.fuel_level - self.fuel_burn_rate * dt)
         if self.fuel_level < 10.0 and self.emergency_index < 1:
             self.emergency_index = 1 # Low fuel warning
+            self.is_emergency = True
         elif self.fuel_level <= 0:
             self.state = "CRASHED"
             self.speed = 0
@@ -285,7 +320,8 @@ class Aircraft:
             "gate": self.gate,
             "active_star": self.active_star,
             "wp_index": self.wp_index,
-            "is_holding": self.state == "HOLDING"
+            "is_holding": self.state == "HOLDING",
+            "queued_takeoff": self.queued_takeoff
         }
         if anchor:
             KM_PER_DEG_LAT = 111.32

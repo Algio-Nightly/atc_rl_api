@@ -19,6 +19,7 @@ class ComplianceRubric(BaseRubric):
     PENALTY_REDUNDANT_COMMAND = -0.05
     REWARD_GLIDE_SLOPE_COMPLIANCE = 0.2
     PENALTY_AIRSPACE_EXIT = -5.0
+    PENALTY_COMMAND_REJECTED = -0.5
 
     COMMAND_PATTERNS = [
         r"ATC\s+VECTOR\s+[A-Z]{3}\d{1,4}\s+\d{1,3}$",
@@ -38,10 +39,17 @@ class ComplianceRubric(BaseRubric):
         self._prev_altitudes: dict[str, int] = {}
         self._in_airspace: dict[str, bool] = {}
 
-    def forward(self, action: "ATCAction", observation: "ATCObservation") -> float:
+    def forward(
+        self,
+        action: "ATCAction",
+        observation: "ATCObservation",
+        events: list[dict] | None = None,
+    ) -> float:
         total_reward = 0.0
 
         total_reward += self._check_command_validity(action)
+
+        total_reward += self._check_command_rejections(observation, events)
 
         total_reward += self._check_glide_slope_compliance(observation)
 
@@ -75,6 +83,22 @@ class ComplianceRubric(BaseRubric):
                 pass
 
         return reward
+
+    def _check_command_rejections(
+        self, observation: "ATCObservation", events: list[dict] | None = None
+    ) -> float:
+        penalty = 0.0
+
+        if events:
+            for event in events:
+                if event.get("type") == "COMMAND_ERROR" and event.get("callsign"):
+                    penalty += self.PENALTY_COMMAND_REJECTED
+
+        for ac in observation.aircraft:
+            if ac.command_rejections:
+                penalty += self.PENALTY_COMMAND_REJECTED * len(ac.command_rejections)
+
+        return penalty
 
     def _is_valid_command_format(self, cmd: str) -> bool:
         cmd = cmd.strip()
