@@ -16,11 +16,18 @@ import os
 import sys
 from typing import Optional
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # Proceed anyway; the validator might have set environment variables directly.
+    pass
 
-load_dotenv()
-
-from openai import OpenAI
+try:
+    from openai import OpenAI
+except ImportError:
+    print("FATAL: 'openai' module not found. Ensure it is in requirements.txt", file=sys.stderr, flush=True)
+    sys.exit(1)
 
 from rl_env.environment import ATCEnv
 from rl_env.models import ATCAction
@@ -258,8 +265,17 @@ def main() -> None:
         print("ERROR: HF_TOKEN environment variable is required", file=sys.stderr, flush=True)
         sys.exit(1)
 
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
-    env = ATCEnv()
+    try:
+        client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    except Exception as exc:
+        print(f"FATAL: Failed to initialize OpenAI client: {exc}", file=sys.stderr, flush=True)
+        sys.exit(1)
+
+    try:
+        env = ATCEnv()
+    except Exception as exc:
+        print(f"FATAL: Failed to initialize ATCEnv: {exc}", file=sys.stderr, flush=True)
+        sys.exit(1)
 
     successes = 0
     total_score = 0.0

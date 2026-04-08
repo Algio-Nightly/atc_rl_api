@@ -3,3 +3,6 @@ uvicorn
 pydantic
 openenv-core
 requests
+python-dotenv
+openai
+httpx
