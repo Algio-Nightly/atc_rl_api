@@ -212,9 +212,15 @@ class ATCEnv(Environment):
 
         aircraft_count = task_config["aircraft_count"]
         spawn_distance_km = task_config["spawn_distance_km"]
-        gates = task_config["gates"]
         ac_types = task_config["ac_types"]
         weight_classes = task_config["weight_classes"]
+
+        upwind_gates = self._select_upwind_gates()
+        available_gates = [g for g in task_config["gates"] if g in upwind_gates]
+        if not available_gates:
+            available_gates = task_config["gates"]
+
+        gates = available_gates
 
         for i in range(aircraft_count):
             callsign = f"RL{i + 1:03d}"
@@ -242,6 +248,43 @@ class ATCEnv(Environment):
                 heading=heading,
                 speed=250,
             )
+
+    def _select_upwind_gates(self) -> list[str]:
+        """Select gates that face into the headwind for arrival spawning.
+
+        Returns gates where the approach heading (from gate to center) is within
+        ±90° of the wind heading, meaning aircraft would approach into the wind.
+        Falls back to all gates if wind_heading is 0 or undefined.
+        """
+        if not self.engine or not self.engine.config:
+            return (
+                list(self.engine.config.gates.keys())
+                if self.engine and self.engine.config
+                else []
+            )
+
+        wind_heading = getattr(self.engine, "wind_heading", 0.0)
+        if wind_heading == 0.0 or wind_heading is None:
+            # No wind or undefined wind — use all gates
+            return list(self.engine.config.gates.keys())
+
+        upwind_gates = []
+        for gate_name, gate_pos in self.engine.config.gates.items():
+            # Calculate bearing from gate to center (0,0)
+            dx = 0 - gate_pos.x
+            dy = 0 - gate_pos.y
+            approach_heading = (90 - math.degrees(math.atan2(dy, dx))) % 360
+
+            # Check if approach heading faces into the wind (within ±90°)
+            diff = (approach_heading - wind_heading + 180) % 360 - 180
+            if abs(diff) < 90:
+                upwind_gates.append(gate_name)
+
+        # Fallback: if no upwind gates found, use all gates
+        if not upwind_gates:
+            return list(self.engine.config.gates.keys())
+
+        return upwind_gates
 
     def _spawn_aircraft_for_departure(self, task_config: dict) -> None:
         """Spawn departure aircraft on the ground at terminal gates."""
@@ -306,6 +349,8 @@ class ATCEnv(Environment):
 
         self.engine.step(1.0)
 
+        step_events = list(self.engine.event_buffer)
+
         observation = self._build_observation()
 
         reward = self.rubric.forward(action, observation)
@@ -320,6 +365,8 @@ class ATCEnv(Environment):
             "step_count": self.step_count,
             "task_name": self.task_name,
             "cumulative_reward": self.cumulative_reward,
+            "events": step_events,
+            "reward_breakdown": self._get_reward_breakdown(),
         }
 
         self._flush_aircraft_metrics()
@@ -790,6 +837,12 @@ class ATCEnv(Environment):
             command_rejections=command_rejections,
             severity_index=severity_index,
         )
+
+    def _get_reward_breakdown(self) -> dict[str, float]:
+        """Get per-rubric reward breakdown from the last step."""
+        if hasattr(self.rubric, "_last_rewards"):
+            return dict(self.rubric._last_rewards)
+        return {}
 
     def _check_terminal_conditions(self, observation: ATCObservation) -> bool:
         """

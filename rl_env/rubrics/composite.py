@@ -57,7 +57,31 @@ class ATCRubric(WeightedSum):
         ]
 
     def forward(self, action: "ATCAction", observation: "ATCObservation") -> float:
-        return super().forward(action, observation)
+        self._last_rewards = {}
+
+        safety_reward = self.safety.forward(action, observation)
+        self._last_rewards["safety"] = safety_reward
+
+        efficiency_reward = self.efficiency.forward(action, observation)
+        self._last_rewards["efficiency"] = efficiency_reward
+
+        compliance_reward = self.compliance.forward(action, observation)
+        self._last_rewards["compliance"] = compliance_reward
+
+        format_reward = self.format.forward(action, observation)
+        self._last_rewards["format"] = format_reward
+
+        departure_reward = self.departure.forward(action, observation)
+        self._last_rewards["departure"] = departure_reward
+
+        total = (
+            safety_reward
+            + efficiency_reward
+            + compliance_reward
+            + format_reward
+            + departure_reward
+        )
+        return total
 
 
 class FormatRubric(BaseRubric):
