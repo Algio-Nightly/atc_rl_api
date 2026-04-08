@@ -71,6 +71,14 @@ class SafetyRubric(BaseRubric):
     def _check_collision_risk(
         self, ac: "AircraftObservation", all_aircraft: list["AircraftObservation"]
     ) -> float:
+        # Use engine's tracked minimum proximity when available
+        if (
+            ac.safety_metrics is not None
+            and ac.safety_metrics.closest_proximity_km is not None
+            and ac.safety_metrics.closest_proximity_km < 0.3
+        ):
+            return self.PENALTY_COLLISION
+
         for other in all_aircraft:
             if other.callsign == ac.callsign:
                 continue
@@ -125,6 +133,14 @@ class SafetyRubric(BaseRubric):
         sep = ac.separation
         if sep.distance is None:
             return 0.0
+
+        # Use engine's authoritative separation check when available
+        if (
+            ac.safety_metrics is not None
+            and ac.safety_metrics.separation_warnings_triggered > 0
+        ):
+            return self.PENALTY_SEPARATION_VIOLATION
+
         if sep.closest_traffic:
             if sep.distance < self.THRESHOLD_SEP_VIOLATION_DIST_KM:
                 alt_diff = 0.0
