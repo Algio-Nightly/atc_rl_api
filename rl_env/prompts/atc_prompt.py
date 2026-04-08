@@ -12,7 +12,6 @@ AVAILABLE_COMMANDS = [
     "SPEED",
     "HOLD",
     "DIRECT",
-    "APPROACH",
     "LAND",
     "GO_AROUND",
     "RESUME",
@@ -24,9 +23,10 @@ def _filter_disabled_commands_from_reference(reference_text: str) -> str:
     filtered_lines: list[str] = []
     for line in reference_text.splitlines():
         upper_line = line.upper()
-        if "ATC VECTOR" in upper_line:
+        # VECTOR, APPROACH, and LINE_UP are deprecated
+        if any(cmd in upper_line for cmd in ["ATC VECTOR", "ATC APPROACH", "ATC LINE_UP"]):
             continue
-        if "VECTOR" in upper_line and line.strip().startswith("###"):
+        if any(cmd in upper_line for cmd in ["VECTOR", "APPROACH", "LINE_UP"]) and line.strip().startswith("###"):
             continue
         filtered_lines.append(line)
     return "\n".join(filtered_lines).strip()
@@ -47,7 +47,6 @@ def _load_command_reference() -> str:
             "- ATC SPEED <CALLSIGN> <SPEED>\n"
             "- ATC HOLD <CALLSIGN>\n"
             "- ATC DIRECT <CALLSIGN> TO <WAYPOINT_OR_PROCEDURE>\n"
-            "- ATC APPROACH <CALLSIGN>\n"
             "- ATC LAND <CALLSIGN> <RUNWAY_ID>\n"
             "- ATC RESUME <CALLSIGN>"
         )
@@ -153,8 +152,6 @@ def _format_available_commands(
             cmd_strs.append(f"ATC HOLD {aircraft.callsign}")
         elif cmd == "DIRECT":
             cmd_strs.append(f"ATC DIRECT {aircraft.callsign} TO <waypoint_or_procedure>")
-        elif cmd == "APPROACH":
-            cmd_strs.append(f"ATC APPROACH {aircraft.callsign}")
         elif cmd == "LAND":
             available = [r for r in active_runways if not runway_occupancy.get(r)]
             runway_hint = available[0] if available else "<runway_id>"
@@ -283,7 +280,6 @@ def generate_atc_prompt(observation: ATCObservation) -> str:
     lines.append("- ATC SPEED <CALLSIGN> <SPEED>")
     lines.append("- ATC HOLD <CALLSIGN>")
     lines.append("- ATC DIRECT <CALLSIGN> TO <WAYPOINT_OR_PROCEDURE>")
-    lines.append("- ATC APPROACH <CALLSIGN>")
     lines.append("- ATC LAND <CALLSIGN> <RUNWAY_ID>")
     lines.append("- ATC RESUME <CALLSIGN>")
     lines.append("")

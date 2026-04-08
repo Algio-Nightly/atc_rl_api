@@ -33,7 +33,7 @@ from rl_env.parsers import parse, ParseError
 
 API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen3.5-9B:together")
+MODEL_NAME = os.getenv("MODEL_NAME", "google/gemma-3n-E4B-it:together")
 
 BENCHMARK_NAME = "atc-rl-env"
 MAX_STEPS_PER_EPISODE = 200
@@ -79,8 +79,16 @@ def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> No
 # ---------------------------------------------------------------------------
 
 SYSTEM_PROMPT = (
-    "You are an Air Traffic Controller managing radar approaches. "
-    "Issue ATC commands in the exact format: ATC <COMMAND> <CALLSIGN> [VALUE]. "
+    "You are an Air Traffic Controller. Issue commands in this format. "
+    "Commands: "
+    "DIRECT <CALLSIGN> TO <WAYPOINT_OR_PROCEDURE>: Fly to waypoint or start procedure. No spaces in names. "
+    "HOLD <CALLSIGN>: Enter holding pattern. "
+    "RESUME <CALLSIGN>: Resume STAR/Route (cancel overrides). "
+    "ALTITUDE <CALLSIGN> <ALTITUDE>: 100-45000 ft. Manual override. "
+    "SPEED <CALLSIGN> <SPEED>: 140-450 kts. Manual override. "
+    "LAND <CALLSIGN> <RUNWAY_ID>: Clear for landing after STAR. "
+    "TAXI <CALLSIGN> TO <RUNWAY_ID>: From gate to runway. "
+    "TAKEOFF <CALLSIGN>: Departure roll. "
     "Respond ONLY with commands, one per line."
 )
 

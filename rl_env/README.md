@@ -24,7 +24,7 @@ python rl_env/inference.py
 
 | Task | Aircraft | Difficulty | Description |
 |------|----------|------------|-------------|
-| `single_approach` | 1 | Easy | Single aircraft approach, learn basic vectoring |
+| `single_approach` | 1 | Easy | Single aircraft approach, learn basic navigation |
 | `traffic_pattern` | 4 | Medium | Four aircraft from cardinal directions, basic separation |
 | `storm_traffic` | 10 | Hard | Ten aircraft with wind effects, multi-aircraft management |
 
@@ -82,7 +82,7 @@ observation, info = env.reset(task="single_approach")
 
 # Execute action
 observation, reward, done, truncated, info = env.step(ATCAction(commands=[
-    "ATC VECTOR RL001 270",
+    "ATC DIRECT RL001 TO N",
     "ATC ALTITUDE RL001 3000"
 ]))
 
@@ -94,11 +94,9 @@ state = env.state  # episode_id, step_count, task_name, cumulative_reward
 
 | Command | Parameters | Description |
 |---------|------------|-------------|
-| `VECTOR` | `heading` | Set aircraft heading in degrees |
 | `ALTITUDE` | `altitude` | Set target altitude in feet |
 | `SPEED` | `speed` | Set target speed in knots |
 | `DIRECT` | `waypoint` | Clear direct to waypoint |
-| `APPROACH` | - | Clear for approach |
 | `LAND` | `runway` | Clear to land on runway |
 | `HOLD` | `waypoint`, `altitude` | Enter holding pattern |
 | `RESUME` | - | Resume normal navigation |

@@ -4,28 +4,6 @@ import pytest
 from rl_env.parsers import parse, ParseError
 
 
-class TestVectorCommand:
-    def test_vector_basic(self):
-        result = parse("ATC VECTOR AAL123 270")
-        assert result == {"command": "VECTOR", "callsign": "AAL123", "heading": 270}
-
-    def test_vector_lowercase(self):
-        result = parse("atc vector aal123 90")
-        assert result == {"command": "VECTOR", "callsign": "AAL123", "heading": 90}
-
-    def test_vector_mixed_case(self):
-        result = parse("AtC VeCtOr UAL456 180")
-        assert result == {"command": "VECTOR", "callsign": "UAL456", "heading": 180}
-
-    def test_vector_float_heading(self):
-        result = parse("ATC VECTOR AAL123 270.5")
-        assert result == {"command": "VECTOR", "callsign": "AAL123", "heading": 270.5}
-
-    def test_vector_whitespace(self):
-        result = parse("  ATC   VECTOR   AAL123   270  ")
-        assert result == {"command": "VECTOR", "callsign": "AAL123", "heading": 270}
-
-
 class TestAltitudeCommand:
     def test_altitude_basic(self):
         result = parse("ATC ALTITUDE AAL123 3000")
@@ -96,16 +74,6 @@ class TestDirectCommand:
         }
 
 
-class TestApproachCommand:
-    def test_approach_basic(self):
-        result = parse("ATC APPROACH AAL123")
-        assert result == {"command": "APPROACH", "callsign": "AAL123"}
-
-    def test_approach_lowercase(self):
-        result = parse("atc approach aal123")
-        assert result == {"command": "APPROACH", "callsign": "AAL123"}
-
-
 class TestLandCommand:
     def test_land_basic(self):
         result = parse("ATC LAND AAL123 27L")
@@ -128,9 +96,9 @@ class TestResumeCommand:
 
 class TestBatchCommands:
     def test_batch_two_commands(self):
-        result = parse("ATC VECTOR AAL123 270\nATC ALTITUDE BBB456 3000")
+        result = parse("ATC ALTITUDE AAL123 5000\nATC ALTITUDE BBB456 3000")
         assert len(result) == 2
-        assert result[0] == {"command": "VECTOR", "callsign": "AAL123", "heading": 270}
+        assert result[0] == {"command": "ALTITUDE", "callsign": "AAL123", "altitude": 5000}
         assert result[1] == {
             "command": "ALTITUDE",
             "callsign": "BBB456",
@@ -139,15 +107,15 @@ class TestBatchCommands:
 
     def test_batch_three_commands(self):
         result = parse(
-            "ATC VECTOR AAL123 270\nATC SPEED AAL123 250\nATC DIRECT AAL123 POM"
+            "ATC ALTITUDE AAL123 5000\nATC SPEED AAL123 250\nATC DIRECT AAL123 POM"
         )
         assert len(result) == 3
-        assert result[0]["command"] == "VECTOR"
+        assert result[0]["command"] == "ALTITUDE"
         assert result[1]["command"] == "SPEED"
         assert result[2]["command"] == "DIRECT"
 
     def test_batch_with_whitespace_lines(self):
-        result = parse("ATC VECTOR AAL123 270\n\nATC ALTITUDE BBB456 3000\n")
+        result = parse("ATC ALTITUDE AAL123 5000\n\nATC ALTITUDE BBB456 3000\n")
         assert len(result) == 2
 
 
@@ -172,10 +140,12 @@ class TestErrorHandling:
         assert "FOO" in str(exc_info.value)
         assert "SUPPORTED" in str(exc_info.value).upper()
 
-    def test_vector_missing_value(self):
-        with pytest.raises(ParseError) as exc_info:
-            parse("ATC VECTOR AAL123")
-        assert "VECTOR" in str(exc_info.value)
+    def test_deprecated_commands_fail(self):
+        for cmd in ["VECTOR", "APPROACH", "LINE_UP"]:
+            with pytest.raises(ParseError) as exc_info:
+                parse(f"ATC {cmd} AAL123")
+            assert cmd in str(exc_info.value)
+            assert "UNKNOWN" in str(exc_info.value).upper()
 
     def test_altitude_missing_value(self):
         with pytest.raises(ParseError) as exc_info:
@@ -199,19 +169,14 @@ class TestErrorHandling:
 
     def test_invalid_number(self):
         with pytest.raises(ParseError) as exc_info:
-            parse("ATC VECTOR AAL123 ABC")
-        assert "heading" in str(exc_info.value).lower()
+            parse("ATC ALTITUDE AAL123 ABC")
+        assert "altitude" in str(exc_info.value).lower()
 
     def test_parse_error_contains_raw_input(self):
         try:
             parse("BAD INPUT")
         except ParseError as e:
             assert e.raw_input == "BAD INPUT"
-
-    def test_approach_missing_callsign(self):
-        with pytest.raises(ParseError) as exc_info:
-            parse("ATC APPROACH")
-        assert "APPROACH" in str(exc_info.value)
 
     def test_resume_missing_callsign(self):
         with pytest.raises(ParseError) as exc_info:
@@ -221,21 +186,13 @@ class TestErrorHandling:
 
 class TestEdgeCases:
     def test_extra_whitespace_between_parts(self):
-        result = parse("ATC   VECTOR   AAL123   270")
-        assert result == {"command": "VECTOR", "callsign": "AAL123", "heading": 270}
+        result = parse("ATC   ALTITUDE   AAL123   5000")
+        assert result == {"command": "ALTITUDE", "callsign": "AAL123", "altitude": 5000}
 
     def test_newline_at_start(self):
-        result = parse("\nATC VECTOR AAL123 270")
-        assert result == {"command": "VECTOR", "callsign": "AAL123", "heading": 270}
+        result = parse("\nATC ALTITUDE AAL123 5000")
+        assert result == {"command": "ALTITUDE", "callsign": "AAL123", "altitude": 5000}
 
     def test_callsign_with_numbers(self):
-        result = parse("ATC VECTOR UAL1234 180")
-        assert result == {"command": "VECTOR", "callsign": "UAL1234", "heading": 180}
-
-    def test_zero_heading(self):
-        result = parse("ATC VECTOR AAL123 0")
-        assert result == {"command": "VECTOR", "callsign": "AAL123", "heading": 0}
-
-    def test_359_heading(self):
-        result = parse("ATC VECTOR AAL123 359")
-        assert result == {"command": "VECTOR", "callsign": "AAL123", "heading": 359}
+        result = parse("ATC ALTITUDE UAL1234 5000")
+        assert result == {"command": "ALTITUDE", "callsign": "UAL1234", "altitude": 5000}

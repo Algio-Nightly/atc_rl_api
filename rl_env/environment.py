@@ -523,19 +523,7 @@ class ATCEnv(Environment):
                 }
             )
 
-        if command == "VECTOR":
-            heading = cmd.get("heading")
-            if heading is not None:
-                aircraft.target_heading = float(heading)
-                self.engine.event_buffer.append(
-                    {
-                        "type": "ATC",
-                        "msg": f"HEADING: {callsign} -> {heading}°",
-                        "timestamp": time.time(),
-                    }
-                )
-
-        elif command == "ALTITUDE":
+        if command == "ALTITUDE":
             altitude = cmd.get("altitude")
             if altitude is not None:
                 aircraft.target_alt = float(altitude)
@@ -609,16 +597,6 @@ class ATCEnv(Environment):
                 else:
                     reject(f"Waypoint {waypoint} not found")
 
-        elif command == "APPROACH":
-            aircraft.state = "APPROACH"
-            self.engine.event_buffer.append(
-                {
-                    "type": "ATC",
-                    "msg": f"APPROACH: {callsign} cleared approach",
-                    "timestamp": time.time(),
-                }
-            )
-
         elif command == "LAND":
             runway = cmd.get("runway")
             if runway and self.engine.config:
@@ -678,22 +656,6 @@ class ATCEnv(Environment):
                     reject(f"Runway {rw_id} not found")
             else:
                 reject("Missing runway assignment")
-
-        elif command == "LINE_UP":
-            if not aircraft.target_runway_id:
-                reject("No runway assigned")
-                return
-            aircraft.state = "LINE_UP"
-            self.engine.runway_status[aircraft.target_runway_id]["occupied_by"] = (
-                callsign
-            )
-            self.engine.event_buffer.append(
-                {
-                    "type": "ATC",
-                    "msg": f"LINE-UP: {callsign} RWY {aircraft.target_runway_id}",
-                    "timestamp": time.time(),
-                }
-            )
 
         elif command == "TAKEOFF":
             if aircraft.state == "TAXIING":

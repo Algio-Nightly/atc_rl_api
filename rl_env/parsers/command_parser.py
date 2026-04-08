@@ -13,16 +13,13 @@ class ParseError(Exception):
 
 # Supported ATC commands
 SUPPORTED_COMMANDS = {
-    "VECTOR",
     "ALTITUDE",
     "SPEED",
     "HOLD",
     "DIRECT",
-    "APPROACH",
     "LAND",
     "RESUME",
     "TAXI",
-    "LINE_UP",
     "TAKEOFF",
 }
 
@@ -122,8 +119,8 @@ def _parse_single_line(line: str, original_input: str) -> dict:
             raw_input=original_input,
         )
 
-    # VECTOR, ALTITUDE, SPEED, DIRECT, LAND, TAXI require callsign + parameter
-    if command in ("VECTOR", "ALTITUDE", "SPEED", "DIRECT", "LAND", "TAXI"):
+    # ALTITUDE, SPEED, DIRECT, LAND, TAXI require callsign + parameter
+    if command in ("ALTITUDE", "SPEED", "DIRECT", "LAND", "TAXI"):
         if len(parts) < 3:
             raise ParseError(
                 f"'{command}' command requires callsign and value. Format: ATC {command} <CALLSIGN> <VALUE>",
@@ -143,9 +140,7 @@ def _parse_single_line(line: str, original_input: str) -> dict:
             "callsign": callsign,
         }
 
-        if command == "VECTOR":
-            result["heading"] = _parse_number(value, "heading", original_input)
-        elif command == "ALTITUDE":
+        if command == "ALTITUDE":
             result["altitude"] = _parse_number(value, "altitude", original_input)
         elif command == "SPEED":
             result["speed"] = _parse_number(value, "speed", original_input)
@@ -195,7 +190,7 @@ def _parse_single_line(line: str, original_input: str) -> dict:
         return result
 
     # APPROACH, RESUME, LINE_UP, and TAKEOFF commands: only require callsign
-    elif command in ("APPROACH", "RESUME", "LINE_UP", "TAKEOFF"):
+    elif command in ("RESUME", "TAKEOFF"):
         if len(parts) < 3:
             raise ParseError(
                 f"'{command}' command requires callsign. Format: ATC {command} <CALLSIGN>",

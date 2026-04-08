@@ -77,11 +77,11 @@ class TestATCEnvStep:
         assert isinstance(info, dict)
         assert env.step_count == 1
 
-    def test_step_with_vector_command(self):
+    def test_step_with_direct_command(self):
         env = ATCEnv(airport_code="VOCB")
         env.reset(task="single_approach")
         callsign = list(env.engine.aircrafts.keys())[0]
-        action = ATCAction(commands=[f"ATC VECTOR {callsign} 270"])
+        action = ATCAction(commands=[f"ATC DIRECT {callsign} TO N"])
         obs, reward, done, truncated, info = env.step(action)
         assert isinstance(obs, ATCObservation)
         assert env.step_count == 1
@@ -184,21 +184,21 @@ class TestATCEnvObservationStructure:
 
 class TestATCActionModel:
     def test_action_with_commands(self):
-        action = ATCAction(commands=["ATC VECTOR AAL123 270"])
+        action = ATCAction(commands=["ATC ALTITUDE AAL123 5000"])
         assert len(action.commands) == 1
-        assert action.commands[0] == "ATC VECTOR AAL123 270"
+        assert action.commands[0] == "ATC ALTITUDE AAL123 5000"
 
     def test_action_with_thought(self):
         action = ATCAction(
-            commands=["ATC VECTOR AAL123 270"],
-            thought="Vectoring to align with approach",
+            commands=["ATC ALTITUDE AAL123 5000"],
+            thought="Aligning with approach altitude",
         )
-        assert action.thought == "Vectoring to align with approach"
+        assert action.thought == "Aligning with approach altitude"
 
     def test_action_example(self):
         action = ATCAction.example()
         assert len(action.commands) > 0
-        assert "ATC VECTOR" in action.commands[0]
+        assert "ATC" in action.commands[0]
 
 
 class TestATCStateModel:
