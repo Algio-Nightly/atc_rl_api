@@ -156,7 +156,7 @@
       "name": "WP_6",
       "x": -9.699947749595495,
       "y": -28.124057110274453,
-      "target_alt": 3000,
+      "target_alt": 5000,
       "target_speed": 210,
       "is_iaf": false,
       "is_faf": false,
@@ -167,7 +167,7 @@
       "name": "WP_7",
       "x": 14.912779439451732,
       "y": -27.523123027911467,
-      "target_alt": 3000,
+      "target_alt": 5000,
       "target_speed": 210,
       "is_iaf": false,
       "is_faf": false,
@@ -178,7 +178,7 @@
       "name": "WP_8",
       "x": 28.194647465246543,
       "y": -5.8216503812600235,
-      "target_alt": 3000,
+      "target_alt": 5000,
       "target_speed": 210,
       "is_iaf": false,
       "is_faf": false,
@@ -189,7 +189,7 @@
       "name": "WP_9",
       "x": 33.672480040859355,
       "y": 14.740233380756242,
-      "target_alt": 3000,
+      "target_alt": 5000,
       "target_speed": 210,
       "is_iaf": false,
       "is_faf": false,
@@ -200,7 +200,7 @@
       "name": "WP_10",
       "x": 13.26766959780447,
       "y": 33.335077595054685,
-      "target_alt": 3000,
+      "target_alt": 5000,
       "target_speed": 210,
       "is_iaf": false,
       "is_faf": false,
@@ -354,5 +354,5 @@
     "RWY_1_REV:E": "Route_RWY1REV_E",
     "RWY_1_REV:W": "Route_RWY1REV_W"
   },
-  "time_scale": 8.0
+  "time_scale": 4.0
 }

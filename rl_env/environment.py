@@ -38,6 +38,7 @@ TASK_CONFIGS = {
     "traffic_pattern": {
         "aircraft_count": 4,
         "spawn_distance_km": 20.0,
+        "spawn_interval_sec": 20.0,
         "gates": ["N", "S", "E", "W"],
         "ac_types": ["B737", "A320", "B777", "E190"],
         "weight_classes": ["Heavy", "Medium", "Light"],
@@ -45,6 +46,7 @@ TASK_CONFIGS = {
     "storm_traffic": {
         "aircraft_count": 10,
         "spawn_distance_km": 25.0,
+        "spawn_interval_sec": 15.0,
         "gates": ["N", "S", "E", "W", "N", "S", "E", "W", "N", "S"],
         "ac_types": ["B737", "A320", "B777", "E190", "A350"],
         "weight_classes": ["Heavy", "Medium", "Light", "Heavy", "Medium"],
@@ -119,6 +121,7 @@ class ATCEnv(Environment):
         ] = {}  # For redundant command detection
         self._previous_observation: Optional[ATCObservation] = None
         self._initial_aircraft_count: int = 0
+        self._pending_spawns: list[dict[str, Any]] = []
 
     def reset(
         self,
@@ -147,6 +150,7 @@ class ATCEnv(Environment):
         self.rubric = ATCRubric()
         self.command_history = {}
         self._previous_observation = None
+        self._pending_spawns = []
 
         # Load airport configuration directly from JSON
         config = self._load_airport_config(self.airport_code)
@@ -163,7 +167,7 @@ class ATCEnv(Environment):
         info = {"episode_id": self.episode_id, "task_name": self.task_name}
 
         self._previous_observation = observation
-        self._initial_aircraft_count = len(self.engine.aircrafts)
+        self._initial_aircraft_count = len(self.engine.aircrafts) + len(self._pending_spawns)
 
         return (observation, info)
 
@@ -216,15 +220,25 @@ class ATCEnv(Environment):
 
         aircraft_count = task_config["aircraft_count"]
         spawn_distance_km = task_config["spawn_distance_km"]
+        spawn_interval_sec = float(task_config.get("spawn_interval_sec", 0.0))
         ac_types = task_config["ac_types"]
         weight_classes = task_config["weight_classes"]
 
+        all_gates = list(task_config["gates"])
         upwind_gates = self._select_upwind_gates()
-        available_gates = [g for g in task_config["gates"] if g in upwind_gates]
-        if not available_gates:
-            available_gates = task_config["gates"]
+        preferred_gates = [g for g in all_gates if g in upwind_gates]
+        if not preferred_gates:
+            preferred_gates = list(all_gates)
 
-        gates = available_gates
+        # Avoid pathological same-gate spawning when wind leaves only one preferred gate.
+        # Fill with remaining configured gates before cycling.
+        gates = list(preferred_gates)
+        if len(gates) < aircraft_count:
+            for gate in all_gates:
+                if gate not in gates:
+                    gates.append(gate)
+                if len(gates) >= aircraft_count:
+                    break
 
         for i in range(aircraft_count):
             callsign = f"RL{i + 1:03d}"
@@ -243,15 +257,43 @@ class ATCEnv(Environment):
             else:
                 heading = None
 
-            self.engine.add_aircraft(
-                callsign=callsign,
-                ac_type=ac_type,
-                weight_class=weight_class,
-                gate=gate,
-                altitude=altitude,
-                heading=heading,
-                speed=250,
-            )
+            spawn_payload = {
+                "callsign": callsign,
+                "ac_type": ac_type,
+                "weight_class": weight_class,
+                "gate": gate,
+                "altitude": altitude,
+                "heading": heading,
+                "speed": 250,
+            }
+
+            if i == 0 or spawn_interval_sec <= 0:
+                self.engine.add_aircraft(**spawn_payload)
+            else:
+                self._pending_spawns.append(
+                    {
+                        "spawn_time": spawn_interval_sec * i,
+                        "payload": spawn_payload,
+                    }
+                )
+
+    def _process_pending_spawns(self) -> None:
+        """Spawn scheduled arrivals once simulation time reaches spawn_time."""
+        if not self._pending_spawns or self.engine is None:
+            return
+
+        current_time = self.engine.simulation_time
+        ready_spawns = [
+            item for item in self._pending_spawns if item["spawn_time"] <= current_time
+        ]
+        if not ready_spawns:
+            return
+
+        self._pending_spawns = [
+            item for item in self._pending_spawns if item["spawn_time"] > current_time
+        ]
+        for item in ready_spawns:
+            self.engine.add_aircraft(**item["payload"])
 
     def _select_upwind_gates(self) -> list[str]:
         """Select gates that face into the headwind for arrival spawning.
@@ -350,6 +392,7 @@ class ATCEnv(Environment):
         self.step_count += 1
 
         self._execute_commands(action)
+        self._process_pending_spawns()
 
         self.engine.step(1.0)
 
@@ -561,11 +604,13 @@ class ATCEnv(Environment):
                         "threshold": {"x": target_rw.start.x, "y": target_rw.start.y},
                         "runway_heading": target_rw.heading,
                     }
-                    aircraft.state = "LANDING"
+                    # LAND is a queued clearance, not an immediate touchdown phase.
+                    # Aircraft transitions to APPROACH/LANDING in aircraft.update()
+                    # when it reaches the right procedure points.
                     self.engine.event_buffer.append(
                         {
                             "type": "ATC",
-                            "msg": f"LAND: {callsign} cleared to land RWY {rw_id}",
+                            "msg": f"LAND: {callsign} queued for RWY {rw_id}",
                             "timestamp": time.time(),
                         }
                     )
@@ -890,7 +935,11 @@ class ATCEnv(Environment):
 
         # Check if all aircraft have landed or exited
         active_count = observation.metrics.planes_active
-        if active_count == 0 and self._initial_aircraft_count > 0:
+        if (
+            active_count == 0
+            and self._initial_aircraft_count > 0
+            and not self._pending_spawns
+        ):
             return True
 
         return False
