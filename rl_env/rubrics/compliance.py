@@ -39,12 +39,17 @@ class ComplianceRubric(BaseRubric):
         self._prev_altitudes: dict[str, int] = {}
         self._in_airspace: dict[str, bool] = {}
 
-    def forward(self, action: "ATCAction", observation: "ATCObservation") -> float:
+    def forward(
+        self,
+        action: "ATCAction",
+        observation: "ATCObservation",
+        events: list[dict] | None = None,
+    ) -> float:
         total_reward = 0.0
 
         total_reward += self._check_command_validity(action)
 
-        total_reward += self._check_command_rejections(observation)
+        total_reward += self._check_command_rejections(observation, events)
 
         total_reward += self._check_glide_slope_compliance(observation)
 
@@ -79,8 +84,15 @@ class ComplianceRubric(BaseRubric):
 
         return reward
 
-    def _check_command_rejections(self, observation: "ATCObservation") -> float:
+    def _check_command_rejections(
+        self, observation: "ATCObservation", events: list[dict] | None = None
+    ) -> float:
         penalty = 0.0
+
+        if events:
+            for event in events:
+                if event.get("type") == "COMMAND_ERROR" and event.get("callsign"):
+                    penalty += self.PENALTY_COMMAND_REJECTED
 
         for ac in observation.aircraft:
             if ac.command_rejections:

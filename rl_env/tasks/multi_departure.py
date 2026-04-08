@@ -11,7 +11,22 @@ class MultiDepartureTask(DepartureTask):
     """Medium task: 3 departure aircraft."""
 
     def setup(self, env: "ATCEnv") -> None:
-        env.reset(task="multi_departure")
+        env.reset(task="multi_departure", skip_spawn=True)
+        runway_id = (
+            env.engine.active_runways[0] if env.engine.active_runways else "RWY_1"
+        )
+        gates = ["G1", "G2", "G3"]
+        ac_types = ["B737", "A320", "E190"]
+        for i in range(3):
+            env.engine.spawn_departure(
+                callsign=f"RL{i + 1:03d}",
+                ac_type=ac_types[i],
+                runway_id=runway_id,
+                gate_id="N",
+                terminal_gate_id=gates[i],
+            )
+        env._initial_aircraft_count = len(env.engine.aircrafts)
+        env._previous_observation = env._build_observation()
 
     def grade(self, env: "ATCEnv") -> float:
         score = 0.0

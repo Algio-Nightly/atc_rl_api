@@ -28,7 +28,30 @@ class TrafficPatternTask(Task):
 
     def setup(self, env: "ATCEnv") -> None:
         """Configure environment for traffic pattern task."""
-        env.reset(task="traffic_pattern")
+        env.reset(task="traffic_pattern", skip_spawn=True)
+        upwind_gates = env._select_upwind_gates()
+        gates = (
+            [g for g in ["N", "S", "E", "W"] if g in upwind_gates]
+            if upwind_gates
+            else ["N", "S", "E", "W"]
+        )
+        if len(gates) < 4:
+            gates = (gates * 4)[:4]
+        ac_types = ["B737", "A320", "B777", "E190"]
+        weight_classes = ["Heavy", "Medium", "Light"]
+        for i in range(4):
+            gate = gates[i % len(gates)]
+            env.engine.add_aircraft(
+                callsign=f"RL{i + 1:03d}",
+                ac_type=ac_types[i],
+                weight_class=weight_classes[i],
+                gate=gate,
+                altitude=8000 + (i * 1000),
+                heading=None,
+                speed=250,
+            )
+        env._initial_aircraft_count = len(env.engine.aircrafts)
+        env._previous_observation = env._build_observation()
 
     def grade(self, env: "ATCEnv") -> float:
         """

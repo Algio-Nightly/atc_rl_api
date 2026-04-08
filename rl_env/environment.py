@@ -121,7 +121,10 @@ class ATCEnv(Environment):
         self._initial_aircraft_count: int = 0
 
     def reset(
-        self, seed: Optional[int] = None, task: str = "single_approach"
+        self,
+        seed: Optional[int] = None,
+        task: str = "single_approach",
+        skip_spawn: bool = False,
     ) -> tuple[ATCObservation, dict]:
         """
         Reset the simulation to initial state for a new episode.
@@ -129,6 +132,7 @@ class ATCEnv(Environment):
         Args:
             seed: Random seed for reproducibility (optional)
             task: Task configuration name (single_approach, traffic_pattern, storm_traffic)
+            skip_spawn: If True, skip aircraft spawning (task classes spawn aircraft themselves)
 
         Returns:
             Tuple of (observation, info dict)
@@ -152,8 +156,8 @@ class ATCEnv(Environment):
         task_config = TASK_CONFIGS.get(task, TASK_CONFIGS["single_approach"])
         self.task_name = task
 
-        # Spawn aircraft based on task
-        self._spawn_aircraft_for_task(task_config)
+        if not skip_spawn:
+            self._spawn_aircraft_for_task(task_config)
 
         observation = self._build_observation()
         info = {"episode_id": self.episode_id, "task_name": self.task_name}
@@ -353,7 +357,7 @@ class ATCEnv(Environment):
 
         observation = self._build_observation()
 
-        reward = self.rubric.forward(action, observation)
+        reward = self.rubric.forward(action, observation, events=step_events)
         reward = max(-100.0, min(100.0, reward))
         self.cumulative_reward += reward
 

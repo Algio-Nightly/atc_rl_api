@@ -11,7 +11,43 @@ class MixedOperationsTask(DepartureTask):
     """Hard task: 6 aircraft (3 arrivals + 3 departures)."""
 
     def setup(self, env: "ATCEnv") -> None:
-        env.reset(task="mixed_operations")
+        env.reset(task="mixed_operations", skip_spawn=True)
+        upwind_gates = env._select_upwind_gates()
+        arrival_gates = (
+            [g for g in ["N", "S", "E"] if g in upwind_gates]
+            if upwind_gates
+            else ["N", "S", "E"]
+        )
+        while len(arrival_gates) < 3:
+            arrival_gates.append(arrival_gates[0])
+        arrival_gates = arrival_gates[:3]
+        arrival_ac_types = ["B737", "A320", "B777"]
+        arrival_weight_classes = ["Heavy", "Medium", "Heavy"]
+        for i, gate in enumerate(arrival_gates):
+            env.engine.add_aircraft(
+                callsign=f"RL{i + 1:03d}",
+                ac_type=arrival_ac_types[i],
+                weight_class=arrival_weight_classes[i],
+                gate=gate,
+                altitude=8000 + i * 1000,
+                heading=None,
+                speed=250,
+            )
+        runway_id = (
+            env.engine.active_runways[0] if env.engine.active_runways else "RWY_1"
+        )
+        departure_gates = ["G1", "G2", "G3"]
+        departure_ac_types = ["E190", "A350", "B737"]
+        for i in range(3):
+            env.engine.spawn_departure(
+                callsign=f"RL{3 + i + 1:03d}",
+                ac_type=departure_ac_types[i],
+                runway_id=runway_id,
+                gate_id="N",
+                terminal_gate_id=departure_gates[i],
+            )
+        env._initial_aircraft_count = len(env.engine.aircrafts)
+        env._previous_observation = env._build_observation()
 
     def grade(self, env: "ATCEnv") -> float:
         score = 0.0

@@ -36,13 +36,19 @@ class BaseRubric(ABC):
         self._weight = value
 
     @abstractmethod
-    def forward(self, action: "ATCAction", observation: "ATCObservation") -> float:
+    def forward(
+        self,
+        action: "ATCAction",
+        observation: "ATCObservation",
+        events: list[dict] | None = None,
+    ) -> float:
         """
         Compute the reward for this rubric.
 
         Args:
             action: The action taken by the agent
             observation: The current observation from the environment
+            events: Optional list of engine events for authoritative signal detection
 
         Returns:
             Scalar reward value (should be bounded roughly [-10, +10] per step)
@@ -110,20 +116,15 @@ class WeightedSum(BaseRubric):
         self._rubrics.append(rubric)
         return self
 
-    def forward(self, action: "ATCAction", observation: "ATCObservation") -> float:
-        """
-        Compute weighted sum of all rubrics.
-
-        Args:
-            action: The action taken by the agent
-            observation: The current observation from the environment
-
-        Returns:
-            Combined weighted reward
-        """
+    def forward(
+        self,
+        action: "ATCAction",
+        observation: "ATCObservation",
+        events: list[dict] | None = None,
+    ) -> float:
         total = 0.0
         for rubric in self._rubrics:
-            total += rubric.weight * rubric.forward(action, observation)
+            total += rubric.weight * rubric.forward(action, observation, events=events)
         return total
 
     def __mul__(self, scalar: float) -> "WeightedSum":

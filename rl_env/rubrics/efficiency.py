@@ -31,7 +31,12 @@ class EfficiencyRubric(BaseRubric):
         self._prev_waypoints: dict[str, str] = {}
         self._holding_start_times: dict[str, float] = {}
 
-    def forward(self, action: "ATCAction", observation: "ATCObservation") -> float:
+    def forward(
+        self,
+        action: "ATCAction",
+        observation: "ATCObservation",
+        events: list[dict] | None = None,
+    ) -> float:
         total_reward = 0.0
 
         aircraft_list = observation.aircraft
@@ -39,7 +44,7 @@ class EfficiencyRubric(BaseRubric):
 
         for ac in aircraft_list:
             reward = self._compute_aircraft_efficiency(
-                ac, aircraft_list, observation, sim_time
+                ac, aircraft_list, observation, sim_time, events
             )
             total_reward += reward
 
@@ -60,10 +65,11 @@ class EfficiencyRubric(BaseRubric):
         all_aircraft: list["AircraftObservation"],
         observation: "ATCObservation",
         sim_time: float,
+        events: list[dict] | None = None,
     ) -> float:
         reward = 0.0
 
-        reward += self._check_landing_success(ac)
+        reward += self._check_landing_success(ac, events)
 
         reward += self._check_star_completion(ac)
 
@@ -77,7 +83,17 @@ class EfficiencyRubric(BaseRubric):
 
         return reward
 
-    def _check_landing_success(self, ac: "AircraftObservation") -> float:
+    def _check_landing_success(
+        self, ac: "AircraftObservation", events: list[dict] | None = None
+    ) -> float:
+        if events:
+            for event in events:
+                if (
+                    event.get("type") == "SUCCESSFUL_LANDING"
+                    and event.get("callsign") == ac.callsign
+                ):
+                    return self.REWARD_LANDING_SUCCESS
+
         prev_state = self._prev_states.get(ac.callsign, "")
         if ac.intent.state == "LANDING" and prev_state == "APPROACH":
             if ac.position.altitude < 100 and ac.position.distance < 0.2:

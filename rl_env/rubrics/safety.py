@@ -35,13 +35,20 @@ class SafetyRubric(BaseRubric):
         self._prev_states: dict[str, str] = {}
         self._holding_start_times: dict[str, float] = {}
 
-    def forward(self, action: "ATCAction", observation: "ATCObservation") -> float:
+    def forward(
+        self,
+        action: "ATCAction",
+        observation: "ATCObservation",
+        events: list[dict] | None = None,
+    ) -> float:
         total_reward = 0.0
 
         aircraft_list = observation.aircraft
 
         for ac in aircraft_list:
-            reward = self._compute_aircraft_safety(ac, aircraft_list, observation)
+            reward = self._compute_aircraft_safety(
+                ac, aircraft_list, observation, events
+            )
             total_reward += reward
 
         self._prev_states = {ac.callsign: ac.intent.state for ac in aircraft_list}
@@ -53,25 +60,36 @@ class SafetyRubric(BaseRubric):
         ac: "AircraftObservation",
         all_aircraft: list["AircraftObservation"],
         observation: "ATCObservation",
+        events: list[dict] | None = None,
     ) -> float:
         reward = 0.0
 
-        reward += self._check_collision_risk(ac, all_aircraft)
+        reward += self._check_collision_risk(ac, all_aircraft, events)
 
         reward += self._check_runway_incursion(ac, observation)
 
         reward += self._check_fuel_exhaustion(ac)
 
-        reward += self._check_separation_violation(ac, all_aircraft)
+        reward += self._check_separation_violation(ac, all_aircraft, events)
 
         reward += self._check_conflict_risk(ac)
 
         return reward
 
     def _check_collision_risk(
-        self, ac: "AircraftObservation", all_aircraft: list["AircraftObservation"]
+        self,
+        ac: "AircraftObservation",
+        all_aircraft: list["AircraftObservation"],
+        events: list[dict] | None = None,
     ) -> float:
-        # Use engine's tracked minimum proximity when available
+        if events:
+            for event in events:
+                if (
+                    event.get("type") == "CRASH"
+                    and event.get("callsign") == ac.callsign
+                ):
+                    return self.PENALTY_COLLISION
+
         if (
             ac.safety_metrics is not None
             and ac.safety_metrics.closest_proximity_km is not None
@@ -128,13 +146,23 @@ class SafetyRubric(BaseRubric):
         return 0.0
 
     def _check_separation_violation(
-        self, ac: "AircraftObservation", all_aircraft: list["AircraftObservation"]
+        self,
+        ac: "AircraftObservation",
+        all_aircraft: list["AircraftObservation"],
+        events: list[dict] | None = None,
     ) -> float:
+        if events:
+            for event in events:
+                if (
+                    event.get("type") == "SEPARATION_VIOLATION"
+                    and event.get("callsign") == ac.callsign
+                ):
+                    return self.PENALTY_SEPARATION_VIOLATION
+
         sep = ac.separation
         if sep.distance is None:
             return 0.0
 
-        # Use engine's authoritative separation check when available
         if (
             ac.safety_metrics is not None
             and ac.safety_metrics.separation_warnings_triggered > 0

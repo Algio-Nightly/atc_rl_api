@@ -56,22 +56,27 @@ class ATCRubric(WeightedSum):
             self.departure,
         ]
 
-    def forward(self, action: "ATCAction", observation: "ATCObservation") -> float:
+    def forward(
+        self,
+        action: "ATCAction",
+        observation: "ATCObservation",
+        events: list[dict] | None = None,
+    ) -> float:
         self._last_rewards = {}
 
-        safety_reward = self.safety.forward(action, observation)
+        safety_reward = self.safety.forward(action, observation, events=events)
         self._last_rewards["safety"] = safety_reward
 
-        efficiency_reward = self.efficiency.forward(action, observation)
+        efficiency_reward = self.efficiency.forward(action, observation, events=events)
         self._last_rewards["efficiency"] = efficiency_reward
 
-        compliance_reward = self.compliance.forward(action, observation)
+        compliance_reward = self.compliance.forward(action, observation, events=events)
         self._last_rewards["compliance"] = compliance_reward
 
-        format_reward = self.format.forward(action, observation)
+        format_reward = self.format.forward(action, observation, events=events)
         self._last_rewards["format"] = format_reward
 
-        departure_reward = self.departure.forward(action, observation)
+        departure_reward = self.departure.forward(action, observation, events=events)
         self._last_rewards["departure"] = departure_reward
 
         total = (
@@ -92,7 +97,12 @@ class FormatRubric(BaseRubric):
     REWARD_WELL_FORMED = 0.05
     PENALTY_MALFORMED = -0.1
 
-    def forward(self, action: "ATCAction", observation: "ATCObservation") -> float:
+    def forward(
+        self,
+        action: "ATCAction",
+        observation: "ATCObservation",
+        events: list[dict] | None = None,
+    ) -> float:
         if not action.commands:
             return 0.0
 

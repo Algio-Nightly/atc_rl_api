@@ -26,32 +26,49 @@ class DepartureRubric(BaseRubric):
         super().__init__(weight)
         self._prev_states: dict[str, str] = {}
 
-    def forward(self, action: "ATCAction", observation: "ATCObservation") -> float:
+    def forward(
+        self,
+        action: "ATCAction",
+        observation: "ATCObservation",
+        events: list[dict] | None = None,
+    ) -> float:
         total_reward = 0.0
 
         aircraft_list = observation.aircraft
 
         for ac in aircraft_list:
-            reward = self._compute_aircraft_departure(ac)
+            reward = self._compute_aircraft_departure(ac, events)
             total_reward += reward
 
         self._prev_states = {ac.callsign: ac.intent.state for ac in aircraft_list}
 
         return total_reward
 
-    def _compute_aircraft_departure(self, ac: "AircraftObservation") -> float:
+    def _compute_aircraft_departure(
+        self, ac: "AircraftObservation", events: list[dict] | None = None
+    ) -> float:
         reward = 0.0
         prev_state = self._prev_states.get(ac.callsign, "")
         current_state = ac.intent.state
 
-        reward += self._check_departure_success(prev_state, current_state)
+        reward += self._check_departure_success(prev_state, current_state, events)
         reward += self._check_taxi_started(prev_state, current_state)
         reward += self._check_taxi_delay(ac)
         reward += self._check_runway_occupancy(ac)
 
         return reward
 
-    def _check_departure_success(self, prev_state: str, current_state: str) -> float:
+    def _check_departure_success(
+        self,
+        prev_state: str,
+        current_state: str,
+        events: list[dict] | None = None,
+    ) -> float:
+        if events:
+            for event in events:
+                if event.get("type") == "SUCCESSFUL_DEPARTURE":
+                    return self.REWARD_DEPARTURE_SUCCESS
+
         if current_state == "CLIMB_OUT" and prev_state == "TAKEOFF_ROLL":
             return self.REWARD_DEPARTURE_SUCCESS
         return 0.0
