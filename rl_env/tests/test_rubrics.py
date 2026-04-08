@@ -244,10 +244,11 @@ class TestFormatRubric:
 
 class TestATCRubric:
     def test_default_weights_sum_to_one(self):
-        assert ATCRubric.DEFAULT_WEIGHTS["safety"] == 0.40
-        assert ATCRubric.DEFAULT_WEIGHTS["efficiency"] == 0.35
-        assert ATCRubric.DEFAULT_WEIGHTS["compliance"] == 0.20
+        assert ATCRubric.DEFAULT_WEIGHTS["safety"] == 0.35
+        assert ATCRubric.DEFAULT_WEIGHTS["efficiency"] == 0.30
+        assert ATCRubric.DEFAULT_WEIGHTS["compliance"] == 0.15
         assert ATCRubric.DEFAULT_WEIGHTS["format"] == 0.05
+        assert ATCRubric.DEFAULT_WEIGHTS["departure"] == 0.15
         total = sum(ATCRubric.DEFAULT_WEIGHTS.values())
         assert abs(total - 1.0) < 0.001
 
