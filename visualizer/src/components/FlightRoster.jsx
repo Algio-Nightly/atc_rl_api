@@ -9,6 +9,10 @@ export default function FlightRoster({ flights, onSelectFlight, gameState, sendW
           <div style={{ marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid #eee' }}>
             <h3 style={{ fontSize: '0.75rem', color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Environment</h3>
             <div style={{ fontSize: '0.85rem', marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px', color: '#1a1a1a' }}>
+              {gameState.current_task && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Task:</span> <span style={{ fontWeight: '600' }}>{gameState.current_task}</span></div>}
+              {typeof gameState.step === 'number' && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>RL Step:</span> <span style={{ fontWeight: '600' }}>{gameState.step}</span></div>}
+              {typeof gameState.reward === 'number' && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Reward:</span> <span style={{ fontWeight: '600' }}>{gameState.reward.toFixed(4)}</span></div>}
+              {typeof gameState.cumulative_reward === 'number' && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Cumulative:</span> <span style={{ fontWeight: '600' }}>{gameState.cumulative_reward.toFixed(4)}</span></div>}
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Sim Time:</span> <span style={{ fontWeight: '600' }}>{gameState.simulation_time?.toFixed(1)}s</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Wind:</span> <span style={{ fontWeight: '600' }}>{gameState.wind_heading}° @ {gameState.wind_speed}kts</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Active RWY:</span> <span style={{ color: '#28a745', fontWeight: 'bold' }}>{(gameState.active_runways && gameState.active_runways.length > 0) ? gameState.active_runways.join(', ') : 'NONE'}</span></div>
