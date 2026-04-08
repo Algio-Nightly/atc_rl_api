@@ -80,11 +80,11 @@ class ATCRubric(WeightedSum):
         self._last_rewards["departure"] = departure_reward
 
         total = (
-            safety_reward
-            + efficiency_reward
-            + compliance_reward
-            + format_reward
-            + departure_reward
+            safety_reward * self.safety.weight
+            + efficiency_reward * self.efficiency.weight
+            + compliance_reward * self.compliance.weight
+            + format_reward * self.format.weight
+            + departure_reward * self.departure.weight
         )
         return total
 
