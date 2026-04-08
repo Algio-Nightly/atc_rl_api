@@ -3,6 +3,10 @@
 import os
 import sys
 import re
+import json
+import time
+import urllib.request
+import urllib.error
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -17,6 +21,127 @@ from rl_env.parsers import parse, ParseError
 TASKS = ["single_approach", "traffic_pattern", "storm_traffic"]
 MAX_STEPS_PER_EPISODE = 200
 VERBOSE = True
+UI_SYNC_URL = os.environ.get("UI_SYNC_URL", "http://localhost:8000/external/state")
+
+
+def _preview(text: str, limit: int = 240) -> str:
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+    return f"{text[:limit]}…"
+
+
+def _post_ui_state(payload: dict) -> None:
+    try:
+        req = urllib.request.Request(
+            UI_SYNC_URL,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=1.5):
+            pass
+    except (urllib.error.URLError, TimeoutError, ValueError):
+        pass
+
+
+def _publish_ui_state(
+    env: ATCEnv,
+    task_name: str,
+    model_name: str,
+    step: int,
+    reward: float,
+    cumulative_reward: float,
+    done: bool,
+    info: dict,
+    prompt: str = "",
+    llm_response: str = "",
+    action_str: str = "",
+    error: str = "none",
+    phase: str = "step",
+) -> None:
+    if env.engine is None:
+        return
+
+    state = env.engine.get_full_state(clear_events=False)
+    state.update(
+        {
+            "source": "rl_env_inference",
+            "current_task": task_name,
+            "model_name": model_name,
+            "step": step,
+            "reward": round(reward, 4),
+            "cumulative_reward": round(cumulative_reward, 4),
+            "done": done,
+            "reward_breakdown": info.get("reward_breakdown", {}),
+        }
+    )
+
+    timestamp = time.time()
+    custom_events = [
+        {
+            "type": "RL_TASK",
+            "task": task_name,
+            "model": model_name,
+            "phase": phase,
+            "step": step,
+            "timestamp": timestamp,
+        }
+    ]
+
+    if prompt:
+        custom_events.append(
+            {
+                "type": "RL_PROMPT",
+                "msg": _preview(prompt),
+                "step": step,
+                "timestamp": timestamp,
+            }
+        )
+
+    if llm_response:
+        custom_events.append(
+            {
+                "type": "RL_RESPONSE",
+                "msg": _preview(llm_response),
+                "step": step,
+                "timestamp": timestamp,
+            }
+        )
+
+    if action_str or phase == "step":
+        custom_events.append(
+            {
+                "type": "RL_ACTION",
+                "action": action_str or "(no commands)",
+                "step": step,
+                "timestamp": timestamp,
+            }
+        )
+
+    if error != "none":
+        custom_events.append(
+            {
+                "type": "RL_ERROR",
+                "msg": error,
+                "step": step,
+                "timestamp": timestamp,
+            }
+        )
+
+    custom_events.append(
+        {
+            "type": "RL_REWARD",
+            "reward": round(reward, 4),
+            "cumulative_reward": round(cumulative_reward, 4),
+            "done": done,
+            "step": step,
+            "timestamp": timestamp,
+        }
+    )
+
+    state["events"] = custom_events + list(info.get("events", []))
+    _post_ui_state(state)
 
 
 def run_episode(
@@ -30,6 +155,18 @@ def run_episode(
     step = 0
     success = False
 
+    _publish_ui_state(
+        env=env,
+        task_name=task_name,
+        model_name=model_name,
+        step=0,
+        reward=0.0,
+        cumulative_reward=0.0,
+        done=False,
+        info=info,
+        phase="start",
+    )
+
     print(f"\n{'=' * 60}")
     print(f"[START] task={task_name} env=ATCEnv-v1 model={model_name}")
     print(f"{'=' * 60}\n")
@@ -40,6 +177,8 @@ def run_episode(
         reward = 0.0
         done = False
         error = "none"
+        prompt = ""
+        llm_response = ""
 
         try:
             prompt = generate_atc_prompt(observation)
@@ -134,6 +273,22 @@ def run_episode(
         try:
             observation, reward, done, _, info = env.step(action)
             episode_rewards.append(reward)
+            cumulative_reward = sum(episode_rewards)
+
+            _publish_ui_state(
+                env=env,
+                task_name=task_name,
+                model_name=model_name,
+                step=step,
+                reward=reward,
+                cumulative_reward=cumulative_reward,
+                done=done,
+                info=info,
+                prompt=prompt,
+                llm_response=llm_response,
+                action_str=action_str,
+                error=error,
+            )
 
             if action_str:
                 print(
@@ -161,6 +316,20 @@ def run_episode(
             break
 
     score = sum(episode_rewards)
+
+    _publish_ui_state(
+        env=env,
+        task_name=task_name,
+        model_name=model_name,
+        step=step,
+        reward=episode_rewards[-1] if episode_rewards else 0.0,
+        cumulative_reward=score,
+        done=success,
+        info={"events": []},
+        action_str="episode complete",
+        phase="end",
+    )
+
     print(f"\n{'=' * 60}")
     print(f"[END] success={success} steps={step} score={score:.4f}")
     print(f"{'=' * 60}\n")
@@ -189,7 +358,7 @@ def main():
 
     print(f"✅ Client initialized\n")
 
-    env = ATCEnv()
+    env = ATCEnv(airport_code="VOCB")
 
     total_success = 0
     total_steps = 0
