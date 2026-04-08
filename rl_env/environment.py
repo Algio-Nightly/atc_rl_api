@@ -49,6 +49,30 @@ TASK_CONFIGS = {
         "ac_types": ["B737", "A320", "B777", "E190", "A350"],
         "weight_classes": ["Heavy", "Medium", "Light", "Heavy", "Medium"],
     },
+    "single_departure": {
+        "aircraft_count": 1,
+        "spawn_distance_km": 0,
+        "gates": ["G1"],
+        "ac_types": ["B737"],
+        "weight_classes": ["Medium"],
+        "is_departure": True,
+    },
+    "multi_departure": {
+        "aircraft_count": 3,
+        "spawn_distance_km": 0,
+        "gates": ["G1", "G2", "G3"],
+        "ac_types": ["B737", "A320", "E190"],
+        "weight_classes": ["Medium", "Medium", "Light"],
+        "is_departure": True,
+    },
+    "mixed_operations": {
+        "aircraft_count": 6,
+        "spawn_distance_km": 20.0,
+        "gates": ["N", "S", "G1", "G2", "E", "G3"],
+        "ac_types": ["B737", "A320", "B777", "E190", "A350", "B737"],
+        "weight_classes": ["Heavy", "Medium", "Heavy", "Light", "Medium", "Medium"],
+        "is_mixed": True,
+    },
 }
 
 # Segment labels for position calculation
@@ -146,6 +170,44 @@ class ATCEnv(Environment):
         Args:
             task_config: Dictionary containing aircraft_count, spawn_distance_km, gates, etc.
         """
+        if task_config.get("is_departure"):
+            self._spawn_aircraft_for_departure(task_config)
+            return
+
+        if task_config.get("is_mixed"):
+            arrival_gates = [g for g in task_config["gates"] if not g.startswith("G")]
+            departure_gates = [g for g in task_config["gates"] if g.startswith("G")]
+
+            if arrival_gates:
+                arrival_config = {
+                    "aircraft_count": len(arrival_gates),
+                    "spawn_distance_km": task_config["spawn_distance_km"],
+                    "gates": arrival_gates,
+                    "ac_types": task_config["ac_types"][: len(arrival_gates)],
+                    "weight_classes": task_config["weight_classes"][
+                        : len(arrival_gates)
+                    ],
+                }
+                self._spawn_arrivals(arrival_config)
+
+            if departure_gates:
+                departure_config = {
+                    "aircraft_count": len(departure_gates),
+                    "spawn_distance_km": 0,
+                    "gates": departure_gates,
+                    "ac_types": task_config["ac_types"][len(arrival_gates) :],
+                    "weight_classes": task_config["weight_classes"][
+                        len(arrival_gates) :
+                    ],
+                    "is_departure": True,
+                }
+                self._spawn_aircraft_for_departure(departure_config)
+            return
+
+        self._spawn_arrivals(task_config)
+
+    def _spawn_arrivals(self, task_config: dict) -> None:
+        """Spawn arrival aircraft in the airspace."""
         import random
 
         aircraft_count = task_config["aircraft_count"]
@@ -160,11 +222,9 @@ class ATCEnv(Environment):
             ac_type = ac_types[i % len(ac_types)]
             weight_class = weight_classes[i % len(weight_classes)]
 
-            # Calculate spawn altitude (higher for longer distances)
             base_altitude = 8000 + (i * 1000)
             altitude = min(base_altitude, 15000)
 
-            # Calculate heading toward center (0,0) from gate position
             if self.engine.config and gate in self.engine.config.gates:
                 gate_pos = self.engine.config.gates[gate]
                 dx = 0 - gate_pos.x
@@ -173,7 +233,6 @@ class ATCEnv(Environment):
             else:
                 heading = None
 
-            # Spawn the aircraft
             self.engine.add_aircraft(
                 callsign=callsign,
                 ac_type=ac_type,
@@ -182,6 +241,38 @@ class ATCEnv(Environment):
                 altitude=altitude,
                 heading=heading,
                 speed=250,
+            )
+
+    def _spawn_aircraft_for_departure(self, task_config: dict) -> None:
+        """Spawn departure aircraft on the ground at terminal gates."""
+        aircraft_count = task_config["aircraft_count"]
+        gates = task_config["gates"]
+        ac_types = task_config["ac_types"]
+        weight_classes = task_config["weight_classes"]
+
+        existing_count = len(self.engine.aircrafts)
+
+        if self.engine.active_runways:
+            runway_id = self.engine.active_runways[0]
+        elif self.engine.config and self.engine.config.runways:
+            runway_id = self.engine.config.runways[0].id
+        else:
+            runway_id = "RWY_1"
+
+        for i in range(aircraft_count):
+            callsign = f"RL{existing_count + i + 1:03d}"
+            ac_type = ac_types[i % len(ac_types)]
+            gate = gates[i % len(gates)]
+
+            terminal_gate_id = gate if gate.startswith("G") else None
+            sid_gate = "N"
+
+            self.engine.spawn_departure(
+                callsign=callsign,
+                ac_type=ac_type,
+                runway_id=runway_id,
+                gate_id=sid_gate,
+                terminal_gate_id=terminal_gate_id,
             )
 
     def _load_airport_config(self, airport_code: str):
