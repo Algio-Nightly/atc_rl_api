@@ -1,0 +1,45 @@
+name: atc-rl-env
+version: 1.0.0
+description: >
+  Air Traffic Control RL Environment for LLM agents.
+  Agents receive structured radar observations and issue ATC commands
+  (vectoring, altitude, speed, approach clearances) to guide aircraft
+  safely through approach, departure, and mixed-traffic scenarios.
+
+environment:
+  module: rl_env.environment
+  class: ATCEnv
+  observation: rl_env.models.ATCObservation
+  action: rl_env.models.ATCAction
+  state: rl_env.models.ATCState
+
+tasks:
+  - name: single_approach
+    description: Guide a single aircraft from entry gate to runway landing
+    difficulty: easy
+    grader: rl_env.rubrics.ATCRubric
+
+  - name: traffic_pattern
+    description: Manage four simultaneous arrivals from cardinal directions
+    difficulty: medium
+    grader: rl_env.rubrics.ATCRubric
+
+  - name: storm_traffic
+    description: Handle ten aircraft under adverse wind with high congestion
+    difficulty: hard
+    grader: rl_env.rubrics.ATCRubric
+
+  - name: single_departure
+    description: Clear a single aircraft for taxi and takeoff
+    difficulty: easy
+    grader: rl_env.rubrics.ATCRubric
+
+  - name: multi_departure
+    description: Sequence three departures through a shared runway
+    difficulty: medium
+    grader: rl_env.rubrics.ATCRubric
+
+  - name: mixed_operations
+    description: Coordinate simultaneous arrivals and departures
+    difficulty: hard
+    grader: rl_env.rubrics.ATCRubric

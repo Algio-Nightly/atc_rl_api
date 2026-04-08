@@ -1,30 +1,42 @@
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "atc-rl-api"
-version = "0.1.0"
-description = "Add your description here"
+name = "atc-rl-env"
+version = "1.0.0"
+description = "Air Traffic Control RL Environment for LLM agents — OpenEnv-compatible"
 readme = "README.md"
 requires-python = ">=3.12"
+keywords = ["openenv", "rl", "atc", "air-traffic-control", "llm"]
 dependencies = [
-    "fastapi>=0.135.3",
-    "numpy>=2.4.4",
+    "fastapi>=0.115.0",
+    "httpx>=0.27.2",
+    "openai>=1.58.0",
     "openenv-core>=0.2.3",
-    "pydantic>=2.12.5",
-    "pygame>=2.6.1",
-    "requests>=2.33.1",
-    "torch>=2.11.0",
-    "uvicorn>=0.43.0",
+    "pydantic>=2.10.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.32.0",
+    "uvicorn>=0.34.0",
 ]
+
+[project.scripts]
+server = "server.app:main"
+atc-rl-server = "server.app:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["api*", "core*", "rl_env*", "visualizer*", "airports*"]
-exclude = ["tests*", "scripts*"]
+include = ["api*", "core*", "rl_env*", "server*", "airports*"]
+exclude = ["tests*", "scripts*", "visualizer*"]
 
 [dependency-groups]
 dev = [
+    "numpy>=2.4.4",
+    "pygame>=2.6.1",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.3.0",
     "pytest-timeout>=2.4.0",
+    "torch>=2.11.0",
 ]
 
 [tool.pytest.ini_options]
