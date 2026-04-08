@@ -41,16 +41,19 @@ class TrafficPatternTask(Task):
         weight_classes = ["Heavy", "Medium", "Light"]
         for i in range(4):
             gate = gates[i % len(gates)]
-            env.engine.add_aircraft(
-                callsign=f"RL{i + 1:03d}",
-                ac_type=ac_types[i],
-                weight_class=weight_classes[i],
-                gate=gate,
-                altitude=8000 + (i * 1000),
-                heading=None,
-                speed=250,
+            payload = {
+                "callsign": f"RL{i + 1:03d}",
+                "ac_type": ac_types[i],
+                "weight_class": weight_classes[i % len(weight_classes)],
+                "gate": gate,
+                "altitude": 8000 + (i * 1000),
+                "heading": None,
+                "speed": 250,
+            }
+            env.add_pending_spawn(
+                spawn_time=i * 20.0, method="add_aircraft", payload=payload
             )
-        env._initial_aircraft_count = len(env.engine.aircrafts)
+        env._initial_aircraft_count = 4
         env._previous_observation = env._build_observation()
 
     def grade(self, env: "ATCEnv") -> float:

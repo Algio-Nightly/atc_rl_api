@@ -18,14 +18,17 @@ class MultiDepartureTask(DepartureTask):
         gates = ["G1", "G2", "G3"]
         ac_types = ["B737", "A320", "E190"]
         for i in range(3):
-            env.engine.spawn_departure(
-                callsign=f"RL{i + 1:03d}",
-                ac_type=ac_types[i],
-                runway_id=runway_id,
-                gate_id="N",
-                terminal_gate_id=gates[i],
+            payload = {
+                "callsign": f"RL{i + 1:03d}",
+                "ac_type": ac_types[i],
+                "runway_id": runway_id,
+                "gate_id": "N",
+                "terminal_gate_id": gates[i],
+            }
+            env.add_pending_spawn(
+                spawn_time=i * 30.0, method="spawn_departure", payload=payload
             )
-        env._initial_aircraft_count = len(env.engine.aircrafts)
+        env._initial_aircraft_count = 3
         env._previous_observation = env._build_observation()
 
     def grade(self, env: "ATCEnv") -> float:

@@ -51,17 +51,20 @@ class StormTrafficTask(Task):
             gate = gates[i % len(gates)]
             ac_type = ac_types[i % len(ac_types)]
             weight_class = weight_classes[i % len(weight_classes)]
-            env.engine.add_aircraft(
-                callsign=f"RL{i + 1:03d}",
-                ac_type=ac_type,
-                weight_class=weight_class,
-                gate=gate,
-                altitude=min(8000 + i * 1000, 15000),
-                heading=None,
-                speed=250,
+            payload = {
+                "callsign": f"RL{i + 1:03d}",
+                "ac_type": ac_type,
+                "weight_class": weight_class,
+                "gate": gate,
+                "altitude": min(8000 + i * 1000, 15000),
+                "heading": None,
+                "speed": 250,
+            }
+            env.add_pending_spawn(
+                spawn_time=i * 15.0, method="add_aircraft", payload=payload
             )
         self._setup_emergency_aircraft(env)
-        env._initial_aircraft_count = len(env.engine.aircrafts)
+        env._initial_aircraft_count = 10
         env._previous_observation = env._build_observation()
 
     def _get_next_wind_change_interval(self) -> float:

@@ -270,11 +270,10 @@ class ATCEnv(Environment):
             if i == 0 or spawn_interval_sec <= 0:
                 self.engine.add_aircraft(**spawn_payload)
             else:
-                self._pending_spawns.append(
-                    {
-                        "spawn_time": spawn_interval_sec * i,
-                        "payload": spawn_payload,
-                    }
+                self.add_pending_spawn(
+                    spawn_time=spawn_interval_sec * i,
+                    method="add_aircraft",
+                    payload=spawn_payload,
                 )
 
     def _process_pending_spawns(self) -> None:
@@ -293,7 +292,26 @@ class ATCEnv(Environment):
             item for item in self._pending_spawns if item["spawn_time"] > current_time
         ]
         for item in ready_spawns:
-            self.engine.add_aircraft(**item["payload"])
+            method_name = item.get("method", "add_aircraft")
+            payload = item["payload"]
+            
+            method = getattr(self.engine, method_name)
+            method(**payload)
+
+    def add_pending_spawn(
+        self, spawn_time: float, method: str, payload: dict[str, Any]
+    ) -> None:
+        """
+        Schedule an aircraft to be spawned at a future simulation time.
+
+        Args:
+            spawn_time: Simulation time at which to spawn
+            method: Name of the engine method to call ('add_aircraft' or 'spawn_departure')
+            payload: Keyword arguments for the engine method
+        """
+        self._pending_spawns.append(
+            {"spawn_time": spawn_time, "method": method, "payload": payload}
+        )
 
     def _select_upwind_gates(self) -> list[str]:
         """Select gates that face into the headwind for arrival spawning.
@@ -348,6 +366,8 @@ class ATCEnv(Environment):
         else:
             runway_id = "RWY_1"
 
+        spawn_interval_sec = float(task_config.get("spawn_interval_sec", 30.0))
+
         for i in range(aircraft_count):
             callsign = f"RL{existing_count + i + 1:03d}"
             ac_type = ac_types[i % len(ac_types)]
@@ -356,13 +376,22 @@ class ATCEnv(Environment):
             terminal_gate_id = gate if gate.startswith("G") else None
             sid_gate = "N"
 
-            self.engine.spawn_departure(
-                callsign=callsign,
-                ac_type=ac_type,
-                runway_id=runway_id,
-                gate_id=sid_gate,
-                terminal_gate_id=terminal_gate_id,
-            )
+            payload = {
+                "callsign": callsign,
+                "ac_type": ac_type,
+                "runway_id": runway_id,
+                "gate_id": sid_gate,
+                "terminal_gate_id": terminal_gate_id,
+            }
+
+            if i == 0 or spawn_interval_sec <= 0:
+                self.engine.spawn_departure(**payload)
+            else:
+                self.add_pending_spawn(
+                    spawn_time=spawn_interval_sec * i,
+                    method="spawn_departure",
+                    payload=payload,
+                )
 
     def _load_airport_config(self, airport_code: str):
         import json
