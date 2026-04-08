@@ -246,6 +246,12 @@
         "f7730339-0a3c-4522-ae58-5d97fb83146f",
         "IAF_RWY_1",
         "FAF_RWY_1"
+      ],
+      "RWY_1_REV": [
+        "995a5815-613e-4732-a8f6-d66181079d32",
+        "c3a2fccd-7b0f-45ab-8e0c-f9bcf1031cee",
+        "IAF_RWY_1_REV",
+        "FAF_RWY_1_REV"
       ]
     },
     "N": {
@@ -273,6 +279,20 @@
         "3c679d2b-23b9-425d-a2a5-97a7eaf70783",
         "IAF_RWY_1_REV",
         "FAF_RWY_1_REV"
+      ]
+    },
+    "E": {
+      "RWY_1_REV": [
+        "3c679d2b-23b9-425d-a2a5-97a7eaf70783",
+        "IAF_RWY_1_REV",
+        "FAF_RWY_1_REV"
+      ],
+      "RWY_1": [
+        "8c3c2eb5-1555-4764-919f-1c4702240521",
+        "81c04ec3-9844-4d10-8e76-ab11e7581af5",
+        "2dede030-03c4-4a42-93d3-e39249f114bb",
+        "IAF_RWY_1",
+        "FAF_RWY_1"
       ]
     }
   },
@@ -319,7 +339,10 @@
     "W:RWY_1": "SUTRA_2B",
     "N:RWY_1_REV": "VOR_19",
     "S:RWY_1_REV": "Route_S_RWY_1_REV",
-    "S:RWY_1": "Route_S_RWY1"
+    "S:RWY_1": "Route_S_RWY1",
+    "E:RWY_1_REV": "Route_E_RWY_1_REV",
+    "E:RWY_1": "Route_E_RWY_1",
+    "W:RWY_1_REV": "Route_W_RWY_1_REV"
   },
   "sid_names": {
     "RWY_1:N": "POOMA_1D",
