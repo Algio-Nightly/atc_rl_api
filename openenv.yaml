@@ -19,24 +19,24 @@ tasks:
     difficulty: easy
     grader: rl_env.rubrics.ATCRubric
 
+  - name: single_departure
+    description: Clear a single aircraft for taxi and takeoff
+    difficulty: easy
+    grader: rl_env.rubrics.ATCRubric
+
   - name: traffic_pattern
     description: Manage four simultaneous arrivals from cardinal directions
+    difficulty: medium
+    grader: rl_env.rubrics.ATCRubric
+
+  - name: multi_departure
+    description: Sequence three departures through a shared runway
     difficulty: medium
     grader: rl_env.rubrics.ATCRubric
 
   - name: storm_traffic
     description: Handle ten aircraft under adverse wind with high congestion
     difficulty: hard
-    grader: rl_env.rubrics.ATCRubric
-
-  - name: single_departure
-    description: Clear a single aircraft for taxi and takeoff
-    difficulty: easy
-    grader: rl_env.rubrics.ATCRubric
-
-  - name: multi_departure
-    description: Sequence three departures through a shared runway
-    difficulty: medium
     grader: rl_env.rubrics.ATCRubric
 
   - name: mixed_operations

@@ -15,10 +15,10 @@ from rl_env.models import ATCAction, ATCObservation, ATCState
 
 AVAILABLE_TASKS = [
     "single_approach",
-    "traffic_pattern",
-    "storm_traffic",
     "single_departure",
+    "traffic_pattern",
     "multi_departure",
+    "storm_traffic",
     "mixed_operations",
 ]
 

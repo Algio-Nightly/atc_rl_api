@@ -78,10 +78,10 @@ ATCAction(
 | Task | Aircraft | Difficulty | Description |
 |------|----------|------------|-------------|
 | `single_approach` | 1 | Easy | Single aircraft approach — learn basic vectoring and landing clearance |
-| `traffic_pattern` | 4 | Medium | Four arrivals from cardinal directions — practice separation and sequencing |
-| `storm_traffic` | 10 | Hard | Ten aircraft with wind effects — manage congestion under adverse conditions |
 | `single_departure` | 1 | Easy | Clear one aircraft from gate through taxi and takeoff |
+| `traffic_pattern` | 4 | Medium | Four arrivals from cardinal directions — practice separation and sequencing |
 | `multi_departure` | 3 | Medium | Sequence three departures through a shared runway |
+| `storm_traffic` | 10 | Hard | Ten aircraft with wind effects — manage congestion under adverse conditions |
 | `mixed_operations` | 6 | Hard | Coordinate simultaneous arrivals and departures on shared airspace |
 
 ### Reward / Grading

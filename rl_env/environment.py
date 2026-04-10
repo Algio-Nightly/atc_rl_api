@@ -35,22 +35,6 @@ TASK_CONFIGS = {
         "ac_types": ["B737"],
         "weight_classes": ["Heavy"],
     },
-    "traffic_pattern": {
-        "aircraft_count": 4,
-        "spawn_distance_km": 20.0,
-        "spawn_interval_sec": 20.0,
-        "gates": ["N", "S", "E", "W"],
-        "ac_types": ["B737", "A320", "B777", "E190"],
-        "weight_classes": ["Heavy", "Medium", "Light"],
-    },
-    "storm_traffic": {
-        "aircraft_count": 10,
-        "spawn_distance_km": 25.0,
-        "spawn_interval_sec": 15.0,
-        "gates": ["N", "S", "E", "W", "N", "S", "E", "W", "N", "S"],
-        "ac_types": ["B737", "A320", "B777", "E190", "A350"],
-        "weight_classes": ["Heavy", "Medium", "Light", "Heavy", "Medium"],
-    },
     "single_departure": {
         "aircraft_count": 1,
         "spawn_distance_km": 0,
@@ -59,6 +43,14 @@ TASK_CONFIGS = {
         "weight_classes": ["Medium"],
         "is_departure": True,
     },
+    "traffic_pattern": {
+        "aircraft_count": 4,
+        "spawn_distance_km": 20.0,
+        "spawn_interval_sec": 20.0,
+        "gates": ["N", "S", "E", "W"],
+        "ac_types": ["B737", "A320", "B777", "E190"],
+        "weight_classes": ["Heavy", "Medium", "Light"],
+    },
     "multi_departure": {
         "aircraft_count": 3,
         "spawn_distance_km": 0,
@@ -66,6 +58,14 @@ TASK_CONFIGS = {
         "ac_types": ["B737", "A320", "E190"],
         "weight_classes": ["Medium", "Medium", "Light"],
         "is_departure": True,
+    },
+    "storm_traffic": {
+        "aircraft_count": 10,
+        "spawn_distance_km": 25.0,
+        "spawn_interval_sec": 15.0,
+        "gates": ["N", "S", "E", "W", "N", "S", "E", "W", "N", "S"],
+        "ac_types": ["B737", "A320", "B777", "E190", "A350"],
+        "weight_classes": ["Heavy", "Medium", "Light", "Heavy", "Medium"],
     },
     "mixed_operations": {
         "aircraft_count": 6,
