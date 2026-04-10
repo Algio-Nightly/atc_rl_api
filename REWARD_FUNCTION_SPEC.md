@@ -83,3 +83,19 @@ A low-weight rubric to ensure the LLM follows the "natural language" prompt form
 | :--- | :--- | :--- | :--- |
 | Well Formed | Reward | +0.05 | Prefix matches `ATC ` and command length is between 10-100 characters. |
 | Malformed | Penalty | -0.1 | Failure to include the `ATC ` prefix or garbage output. |
+
+---
+
+## Score Normalization
+
+The raw cumulative reward from the weighted rubric sum is normalized to a
+submission score in the open interval **(0, 1)** using a sigmoid (logistic)
+function:
+
+`score = σ(k × R / R_max)` where `k = 6`, `R` is cumulative reward, and
+`R_max = steps × 5.0`.
+
+This guarantees scores are strictly between 0 and 1 (never exactly 0.0 or 1.0)
+while preserving the relative ordering of all rewards. An additional epsilon
+clamp (`ε = 0.001`) guards against floating-point edge cases.
+

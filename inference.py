@@ -13,6 +13,7 @@ STDOUT FORMAT:
 """
 
 import os
+import math
 import sys
 from typing import Optional
 
@@ -160,17 +161,26 @@ def build_commands_from_response(llm_text: str) -> tuple[list[str], Optional[str
 # ---------------------------------------------------------------------------
 
 MAX_REWARD_PER_STEP = 5.0
+SIGMOID_STEEPNESS = 6.0
+EPSILON = 0.001
 
 
 def normalize_score(cumulative_reward: float, steps_taken: int) -> float:
-    """Clamp score into [0, 1]."""
+    """Map cumulative reward to the open interval (0, 1) using sigmoid normalization.
+
+    Uses a logistic function so the score is strictly between 0 and 1
+    (never exactly 0.0 or 1.0), as required by the submission validator.
+    """
     if steps_taken <= 0:
-        return 0.0
+        return EPSILON
     theoretical_max = steps_taken * MAX_REWARD_PER_STEP
     if theoretical_max <= 0:
-        return 0.0
-    score = cumulative_reward / theoretical_max
-    return max(0.0, min(1.0, score))
+        return EPSILON
+    raw_ratio = cumulative_reward / theoretical_max
+    # Clamp to prevent math.exp overflow on extreme values
+    raw_ratio = max(-10.0, min(10.0, raw_ratio))
+    score = 1.0 / (1.0 + math.exp(-SIGMOID_STEEPNESS * raw_ratio))
+    return max(EPSILON, min(1.0 - EPSILON, score))
 
 
 # ---------------------------------------------------------------------------
