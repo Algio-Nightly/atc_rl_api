@@ -162,7 +162,7 @@ def build_commands_from_response(llm_text: str) -> tuple[list[str], Optional[str
 
 MAX_REWARD_PER_STEP = 5.0
 SIGMOID_STEEPNESS = 6.0
-EPSILON = 0.001
+EPSILON = 0.01
 
 
 def normalize_score(cumulative_reward: float, steps_taken: int) -> float:
