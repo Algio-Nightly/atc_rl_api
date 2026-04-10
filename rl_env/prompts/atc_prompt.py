@@ -13,7 +13,6 @@ AVAILABLE_COMMANDS = [
     "HOLD",
     "DIRECT",
     "LAND",
-    "GO_AROUND",
     "RESUME",
 ]
 
@@ -156,8 +155,6 @@ def _format_available_commands(
             available = [r for r in active_runways if not runway_occupancy.get(r)]
             runway_hint = available[0] if available else "<runway_id>"
             cmd_strs.append(f"ATC LAND {aircraft.callsign} {runway_hint}")
-        elif cmd == "GO_AROUND":
-            cmd_strs.append(f"ATC GO_AROUND {aircraft.callsign}")
         elif cmd == "RESUME":
             cmd_strs.append(f"ATC RESUME {aircraft.callsign}")
 

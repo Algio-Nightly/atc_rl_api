@@ -122,6 +122,7 @@ class ATCEnv(Environment):
         self._previous_observation: Optional[ATCObservation] = None
         self._initial_aircraft_count: int = 0
         self._pending_spawns: list[dict[str, Any]] = []
+        self._planes_landed: int = 0
 
     def reset(
         self,
@@ -151,6 +152,7 @@ class ATCEnv(Environment):
         self.command_history = {}
         self._previous_observation = None
         self._pending_spawns = []
+        self._planes_landed = 0
 
         # Load airport configuration directly from JSON
         config = self._load_airport_config(self.airport_code)
@@ -426,6 +428,11 @@ class ATCEnv(Environment):
         self.engine.step(1.0)
 
         step_events = list(self.engine.event_buffer)
+
+        # Track successful landings and departures
+        for evt in step_events:
+            if evt.get("type") in ("SUCCESSFUL_LANDING", "SUCCESSFUL_DEPARTURE"):
+                self._planes_landed += 1
 
         observation = self._build_observation()
 
@@ -736,7 +743,7 @@ class ATCEnv(Environment):
         # Build metrics
         metrics = Metrics(
             simulation_time=round(self.engine.simulation_time, 1),
-            planes_landed=0,  # Would need to track this separately
+            planes_landed=self._planes_landed,
             planes_active=len(self.engine.aircrafts),
         )
 

@@ -4,6 +4,7 @@ from .base import BaseRubric, WeightedSum
 from .safety import SafetyRubric
 from .efficiency import EfficiencyRubric
 from .compliance import ComplianceRubric
+from .departure import DepartureRubric
 from .composite import ATCRubric, FormatRubric
 
 __all__ = [
@@ -12,6 +13,8 @@ __all__ = [
     "SafetyRubric",
     "EfficiencyRubric",
     "ComplianceRubric",
+    "DepartureRubric",
     "ATCRubric",
     "FormatRubric",
 ]
+

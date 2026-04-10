@@ -49,7 +49,7 @@ LLM_TEMPERATURE = 0.7
 LLM_MAX_TOKENS = 1024
 SUCCESS_SCORE_THRESHOLD = 0.1
 
-TASKS = ["single_approach", "traffic_pattern", "storm_traffic"]
+TASKS = ["single_approach", "traffic_pattern", "storm_traffic", "single_departure", "multi_departure", "mixed_operations"]
 
 
 # ---------------------------------------------------------------------------

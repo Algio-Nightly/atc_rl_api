@@ -66,10 +66,8 @@ ATCAction(
 | `SPEED` | `ATC SPEED <callsign> <knots>` | Set target speed |
 | `HOLD` | `ATC HOLD <callsign>` | Enter holding pattern |
 | `DIRECT` | `ATC DIRECT <callsign> TO <waypoint>` | Direct to waypoint/procedure |
-| `APPROACH` | `ATC APPROACH <callsign>` | Clear for approach |
 | `LAND` | `ATC LAND <callsign> <runway_id>` | Clear to land on specified runway |
 | `TAXI` | `ATC TAXI <callsign> <runway_id>` | Taxi to runway (departures) |
-| `LINE_UP` | `ATC LINE_UP <callsign>` | Line up on runway |
 | `TAKEOFF` | `ATC TAKEOFF <callsign>` | Cleared for takeoff |
 | `RESUME` | `ATC RESUME <callsign>` | Resume normal navigation |
 
@@ -98,7 +96,7 @@ All tasks use the composite `ATCRubric` which combines five weighted components:
 | Format | 5% | Well-formed command syntax |
 | Departure | 15% | Departure sequencing, runway utilisation |
 
-Scores are normalised to **[0, 1]** in the inference script.
+Scores are normalised to the open interval **(0, 1)** using sigmoid normalisation in the inference script.
 
 ### Terminal conditions
 
