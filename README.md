@@ -78,11 +78,8 @@ ATCAction(
 | Task | Aircraft | Difficulty | Description |
 |------|----------|------------|-------------|
 | `single_approach` | 1 | Easy | Single aircraft approach — learn basic vectoring and landing clearance |
-| `single_departure` | 1 | Easy | Clear one aircraft from gate through taxi and takeoff |
-| `traffic_pattern` | 4 | Medium | Four arrivals from cardinal directions — practice separation and sequencing |
 | `multi_departure` | 3 | Medium | Sequence three departures through a shared runway |
-| `storm_traffic` | 10 | Hard | Ten aircraft with wind effects — manage congestion under adverse conditions |
-| `mixed_operations` | 6 | Hard | Coordinate simultaneous arrivals and departures on shared airspace |
+| `traffic_pattern` | 4 | Medium | Four arrivals from cardinal directions — practice separation and sequencing |
 
 ### Reward / Grading
 
@@ -182,10 +179,10 @@ Baseline results using `Qwen/Qwen2.5-72B-Instruct` via HuggingFace Inference API
 | Task | Score | Steps | Success |
 |------|-------|-------|---------|
 | `single_approach` | ~0.35 | ~80 | Yes |
+| `multi_departure` | ~0.25 | ~120 | Yes |
 | `traffic_pattern` | ~0.20 | ~150 | Yes |
-| `storm_traffic` | ~0.10 | ~200 | Partial |
 
-Average baseline score: **~0.22**
+Average baseline score: **~0.27**
 
 These scores represent a basic prompting strategy without fine-tuning or advanced reasoning chains. There is significant room for improvement through:
 - Better prompt engineering and chain-of-thought reasoning

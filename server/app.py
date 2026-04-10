@@ -15,11 +15,8 @@ from rl_env.models import ATCAction, ATCObservation, ATCState
 
 AVAILABLE_TASKS = [
     "single_approach",
-    "single_departure",
-    "traffic_pattern",
     "multi_departure",
-    "storm_traffic",
-    "mixed_operations",
+    "traffic_pattern",
 ]
 
 app = FastAPI(
@@ -125,35 +122,17 @@ async def list_tasks():
             difficulty="easy",
             aircraft_count=1,
         ),
-        "traffic_pattern": TaskInfo(
-            name="traffic_pattern",
-            description="Manage four aircraft arriving from cardinal directions",
-            difficulty="medium",
-            aircraft_count=4,
-        ),
-        "storm_traffic": TaskInfo(
-            name="storm_traffic",
-            description="Handle ten aircraft with wind effects and congestion",
-            difficulty="hard",
-            aircraft_count=10,
-        ),
-        "single_departure": TaskInfo(
-            name="single_departure",
-            description="Clear a single aircraft for taxi and takeoff",
-            difficulty="easy",
-            aircraft_count=1,
-        ),
         "multi_departure": TaskInfo(
             name="multi_departure",
             description="Sequence three departures through a shared runway",
             difficulty="medium",
             aircraft_count=3,
         ),
-        "mixed_operations": TaskInfo(
-            name="mixed_operations",
-            description="Coordinate simultaneous arrivals and departures",
-            difficulty="hard",
-            aircraft_count=6,
+        "traffic_pattern": TaskInfo(
+            name="traffic_pattern",
+            description="Manage four aircraft arriving from cardinal directions",
+            difficulty="medium",
+            aircraft_count=4,
         ),
     }
     return [task_metadata[t] for t in AVAILABLE_TASKS]
