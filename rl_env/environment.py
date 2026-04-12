@@ -807,6 +807,9 @@ class ATCEnv(Environment):
         observable_state = ac.state
         if ac.state == "ENROUTE" and getattr(ac, "queued_landing", None):
             observable_state = "ENROUTE_CLEARED"
+        # Normalize engine-internal crash variants to the schema-valid "CRASHED"
+        elif ac.state.startswith("CRASHED"):
+            observable_state = "CRASHED"
 
         intent = Intent(
             state=observable_state,
