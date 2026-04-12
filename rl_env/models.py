@@ -43,7 +43,7 @@ class Motion(BaseModel):
 
 class Intent(BaseModel):
     state: str = Field(
-        description="Aircraft state: ENROUTE, HOLDING, APPROACH, LANDING, GO_AROUND, TAXIING, CRASHED"
+        description="Aircraft state: ENROUTE, ENROUTE_CLEARED, HOLDING, APPROACH, LANDING, GO_AROUND, TAXIING, CRASHED"
     )
     assigned_runway: Optional[str] = Field(
         default=None, description="Assigned runway ID"

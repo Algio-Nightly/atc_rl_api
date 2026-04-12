@@ -123,6 +123,9 @@ class EfficiencyRubric(BaseRubric):
 
     def _check_go_around(self, ac: "AircraftObservation") -> float:
         prev_state = self._prev_states.get(ac.callsign, "")
+        # Normalize observation-layer state for transition checks
+        if prev_state == "ENROUTE_CLEARED":
+            prev_state = "ENROUTE"
         if ac.intent.state == "GO_AROUND" and prev_state in ["APPROACH", "LANDING"]:
             return self.PENALTY_GO_AROUND
         return 0.0

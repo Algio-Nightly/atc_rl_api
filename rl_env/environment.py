@@ -801,8 +801,15 @@ class ATCEnv(Environment):
         if hasattr(ac, "direct_to_wp") and ac.direct_to_wp:
             next_wp = ac.direct_to_wp.get("name", "Direct")
 
+        # Map to observation-layer state: if aircraft is ENROUTE but has a
+        # queued landing clearance, expose it as ENROUTE_CLEARED so the LLM
+        # knows not to re-issue the LAND command.
+        observable_state = ac.state
+        if ac.state == "ENROUTE" and getattr(ac, "queued_landing", None):
+            observable_state = "ENROUTE_CLEARED"
+
         intent = Intent(
-            state=ac.state,
+            state=observable_state,
             assigned_runway=ac.target_runway_id,
             distance_to_threshold=dist_to_thresh,
             next_waypoint=next_wp,

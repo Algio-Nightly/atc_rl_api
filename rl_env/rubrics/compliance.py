@@ -153,6 +153,8 @@ class ComplianceRubric(BaseRubric):
                 return abs(float(value) - ac.motion.target_speed) < 1.0
             if command == "HOLD" and ac.intent.state == "HOLDING":
                 return True
+            if command == "LAND" and ac.intent.state == "ENROUTE_CLEARED":
+                return True
             if command == "RESUME" and ac.intent.assigned_runway is None and ac.intent.next_waypoint:
                 # If already correctly following STAR and no override exists
                 # (Simple heuristic: check if targets match current STAR targets)

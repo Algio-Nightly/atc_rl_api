@@ -70,6 +70,10 @@ def _get_available_commands(
     _ = aircraft  # Kept for API consistency and future extensions.
     commands = list(AVAILABLE_COMMANDS)
 
+    # Aircraft already cleared for landing — don't offer LAND again
+    if aircraft.intent.state == "ENROUTE_CLEARED":
+        commands = [c for c in commands if c != "LAND"]
+
     # Filter LAND command based on runway availability
     if "LAND" in commands:
         # Only show LAND if there's an available (unoccupied) runway
@@ -101,6 +105,9 @@ def _format_aircraft_info(aircraft: AircraftObservation) -> str:
         f"    Heading: {motion.heading:.0f}° (target: {motion.target_heading:.0f}°)\n"
         f"    Speed: {motion.speed}kts (target: {motion.target_speed}kts)"
     )
+
+    if intent.state == "ENROUTE_CLEARED":
+        info += f"\n    ** CLEARED FOR LANDING **"
 
     if intent.assigned_runway:
         info += f"\n    Assigned Runway: {intent.assigned_runway}"

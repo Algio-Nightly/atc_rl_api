@@ -43,7 +43,7 @@ class AircraftState(BaseModel):
     target_speed: int = Field(ge=0, le=600)
     
     # System Status
-    state: Literal["ENROUTE", "HOLDING", "APPROACH", "LANDING", "GO_AROUND", "HOLDING_SHORT", "LINE_UP", "TAKEOFF_ROLL", "CLIMB_OUT", "ON_GATE", "TAXIING", "CRASHED"]
+    state: Literal["ENROUTE", "ENROUTE_CLEARED", "HOLDING", "APPROACH", "LANDING", "GO_AROUND", "HOLDING_SHORT", "LINE_UP", "TAKEOFF_ROLL", "CLIMB_OUT", "ON_GATE", "TAXIING", "CRASHED"]
     fuel_level: float = Field(ge=0.0, le=100.0)
     emergency_index: int = Field(default=0, ge=0, le=3, description="0=Normal, 1=Low Fuel, 3=Critical")
     
