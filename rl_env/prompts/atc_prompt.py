@@ -6,38 +6,12 @@ from pathlib import Path
 from rl_env.models import ATCObservation, AircraftObservation
 
 
-# Full command set exposed to the model for each aircraft.
-AVAILABLE_COMMANDS = [
-    "ALTITUDE",
-    "SPEED",
-    "HOLD",
-    "DIRECT",
-    "LAND",
-    "RESUME",
-]
-
-
-def _filter_disabled_commands_from_reference(reference_text: str) -> str:
-    """Remove disabled command documentation from model-facing reference text."""
-    filtered_lines: list[str] = []
-    for line in reference_text.splitlines():
-        upper_line = line.upper()
-        # VECTOR, APPROACH, and LINE_UP are deprecated
-        if any(cmd in upper_line for cmd in ["ATC VECTOR", "ATC APPROACH", "ATC LINE_UP"]):
-            continue
-        if any(cmd in upper_line for cmd in ["VECTOR", "APPROACH", "LINE_UP"]) and line.strip().startswith("###"):
-            continue
-        filtered_lines.append(line)
-    return "\n".join(filtered_lines).strip()
-
-
 @lru_cache(maxsize=1)
 def _load_command_reference() -> str:
     """Load authoritative ATC command documentation from repository root."""
     reference_path = Path(__file__).resolve().parents[2] / "ATC_COMMAND_REFERENCE.md"
     try:
-        loaded = reference_path.read_text(encoding="utf-8").strip()
-        return _filter_disabled_commands_from_reference(loaded)
+        return reference_path.read_text(encoding="utf-8").strip()
     except (FileNotFoundError, OSError):
         return (
             "# ATC Command Reference (fallback)\n"
@@ -49,39 +23,6 @@ def _load_command_reference() -> str:
             "- ATC LAND <CALLSIGN> <RUNWAY_ID>\n"
             "- ATC RESUME <CALLSIGN>"
         )
-
-
-def _get_available_commands(
-    aircraft: AircraftObservation,
-    active_runways: list[str],
-    runway_occupancy: dict[str, str | None],
-) -> list[str]:
-    """
-    Get available commands for an aircraft.
-
-    Args:
-        aircraft: AircraftObservation instance
-        active_runways: List of active runway IDs
-        runway_occupancy: Map of runway ID to occupying aircraft callsign
-
-    Returns:
-        List of command names
-    """
-    _ = aircraft  # Kept for API consistency and future extensions.
-    commands = list(AVAILABLE_COMMANDS)
-
-    # Aircraft already cleared for landing — don't offer LAND again
-    if aircraft.intent.state == "ENROUTE_CLEARED":
-        commands = [c for c in commands if c != "LAND"]
-
-    # Filter LAND command based on runway availability
-    if "LAND" in commands:
-        # Only show LAND if there's an available (unoccupied) runway
-        available = [r for r in active_runways if not runway_occupancy.get(r)]
-        if not available:
-            commands = [c for c in commands if c != "LAND"]
-
-    return commands
 
 
 def _format_aircraft_info(aircraft: AircraftObservation) -> str:
@@ -130,42 +71,7 @@ def _format_aircraft_info(aircraft: AircraftObservation) -> str:
     return info
 
 
-def _format_available_commands(
-    aircraft: AircraftObservation,
-    active_runways: list[str],
-    runway_occupancy: dict[str, str | None],
-) -> str:
-    """
-    Format available commands for an aircraft.
 
-    Args:
-        aircraft: AircraftObservation instance
-        active_runways: List of active runway IDs
-        runway_occupancy: Map of runway ID to occupying aircraft callsign
-
-    Returns:
-        Formatted string with available commands
-    """
-    valid_cmds = _get_available_commands(aircraft, active_runways, runway_occupancy)
-
-    cmd_strs = []
-    for cmd in valid_cmds:
-        if cmd == "ALTITUDE":
-            cmd_strs.append(f"ATC ALTITUDE {aircraft.callsign} <altitude>")
-        elif cmd == "SPEED":
-            cmd_strs.append(f"ATC SPEED {aircraft.callsign} <speed>")
-        elif cmd == "HOLD":
-            cmd_strs.append(f"ATC HOLD {aircraft.callsign}")
-        elif cmd == "DIRECT":
-            cmd_strs.append(f"ATC DIRECT {aircraft.callsign} TO <waypoint_or_procedure>")
-        elif cmd == "LAND":
-            available = [r for r in active_runways if not runway_occupancy.get(r)]
-            runway_hint = available[0] if available else "<runway_id>"
-            cmd_strs.append(f"ATC LAND {aircraft.callsign} {runway_hint}")
-        elif cmd == "RESUME":
-            cmd_strs.append(f"ATC RESUME {aircraft.callsign}")
-
-    return f"  {aircraft.callsign}:\n    " + "\n    ".join(cmd_strs)
 
 
 def generate_atc_prompt(observation: ATCObservation) -> str:
@@ -179,10 +85,6 @@ def generate_atc_prompt(observation: ATCObservation) -> str:
         Formatted prompt string for the LLM
     """
     lines = []
-
-    # System instruction
-    lines.append("SYSTEM: You are an Air Traffic Controller.")
-    lines.append("")
 
     # Current traffic overview
     lines.append("CURRENT TRAFFIC:")
@@ -211,15 +113,6 @@ def generate_atc_prompt(observation: ATCObservation) -> str:
         lines.append(f"  Runway Occupancy: {', '.join(occ_parts)}")
     lines.append("")
 
-    # Available commands by aircraft
-    lines.append("AVAILABLE COMMANDS:")
-    for ac in observation.aircraft:
-        cmd_section = _format_available_commands(
-            ac,
-            observation.airport_status.active_runways,
-            observation.airport_status.runway_occupancy,
-        )
-        lines.append(cmd_section)
     lines.append("")
 
     # Priority notices
@@ -277,21 +170,9 @@ def generate_atc_prompt(observation: ATCObservation) -> str:
         lines.append("PRIORITY NOTICES:")
         lines.extend(priority_lines)
 
-    # Response instruction (command reference aligned)
+    # Response instruction
     lines.append("")
-    lines.append("ATC COMMAND REFERENCE (for output format):")
-    lines.append("- ATC ALTITUDE <CALLSIGN> <ALTITUDE>")
-    lines.append("- ATC SPEED <CALLSIGN> <SPEED>")
-    lines.append("- ATC HOLD <CALLSIGN>")
-    lines.append("- ATC DIRECT <CALLSIGN> TO <WAYPOINT_OR_PROCEDURE>")
-    lines.append("- ATC LAND <CALLSIGN> <RUNWAY_ID>")
-    lines.append("- ATC RESUME <CALLSIGN>")
-    lines.append("- ATC TAXI <CALLSIGN> TO <RUNWAY_ID>")
-    lines.append("- ATC TAKEOFF <CALLSIGN>")
-    lines.append("- ATC PASS")
-    lines.append("")
-    lines.append("Only issue commands that appear in AVAILABLE COMMANDS.")
-    lines.append("If no action is necessary for any aircraft, respond with: ATC PASS")
+    lines.append("Only issue commands that appear in the AUTHORITATIVE ATC COMMAND REFERENCE below.")
     lines.append("Commands must use exact callsigns from CURRENT TRAFFIC.")
     lines.append("")
     lines.append("AUTHORITATIVE ATC COMMAND REFERENCE:")
