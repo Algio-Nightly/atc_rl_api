@@ -98,7 +98,8 @@ SYSTEM_PROMPT = (
     "  ATC ALTITUDE <CALLSIGN> <ALT_FT> — Manual altitude override (100-45000)\n"
     "  ATC SPEED <CALLSIGN> <SPEED_KTS> — Manual speed override (140-450)\n"
     "  ATC TAXI <CALLSIGN> TO <RUNWAY_ID> — Taxi from gate to runway (departures only)\n"
-    "  ATC TAKEOFF <CALLSIGN> — Clear for takeoff (must be HOLDING_SHORT & runway clear)\n\n"
+    "  ATC TAKEOFF <CALLSIGN> — Clear for takeoff (must be HOLDING_SHORT & runway clear)\n"
+    "  ATC PASS — Do nothing. Everything is going as it should\n\n"
 
     "KEY AIRCRAFT STATE MEANINGS:\n"
     "  ENROUTE — Flying a STAR route, NO landing clearance yet. Issue LAND to clear them.\n"
@@ -125,7 +126,7 @@ SYSTEM_PROMPT = (
     "  Priority: Emergency > Low Fuel > Separation Conflict > Normal operations.\n"
     "  NEVER command aircraft in LANDING, TAKEOFF_ROLL, LINE_UP, or CRASHED states.\n"
     "  Repeated or toggling commands (ALT 5000 -> ALT 4000 -> ALT 5000) incur escalating penalties.\n"
-    "  If all aircraft are progressing normally, issue NO commands rather than redundant ones.\n\n"
+    "  If all aircraft are progressing normally, issue NO commands (ATC PASS) rather than redundant ones.\n\n"
 
     "Respond ONLY with ATC commands, one per line. No explanations."
 )
