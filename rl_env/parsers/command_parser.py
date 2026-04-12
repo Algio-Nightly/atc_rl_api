@@ -21,6 +21,7 @@ SUPPORTED_COMMANDS = {
     "RESUME",
     "TAXI",
     "TAKEOFF",
+    "PASS",
 }
 
 
@@ -199,6 +200,12 @@ def _parse_single_line(line: str, original_input: str) -> dict:
         return {
             "command": command,
             "callsign": parts[2],
+        }
+
+    # PASS command: ATC PASS (Sectoral, no callsign required)
+    elif command == "PASS":
+        return {
+            "command": "PASS",
         }
 
     # Should not reach here since we validate command earlier

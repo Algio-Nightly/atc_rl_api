@@ -505,6 +505,17 @@ class ATCEnv(Environment):
         import time
 
         command = cmd.get("command", "").upper()
+
+        if command == "PASS":
+            self.engine.event_buffer.append(
+                {
+                    "type": "ATC",
+                    "msg": "PASS: Sector Review Complete",
+                    "timestamp": time.time(),
+                }
+            )
+            return
+
         callsign = cmd.get("callsign", "").upper()
 
         # Check if aircraft exists

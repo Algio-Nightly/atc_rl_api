@@ -36,6 +36,7 @@ class ComplianceRubric(BaseRubric):
         r"ATC\s+RESUME\s+[A-Z0-9]{2,10}$",
         r"ATC\s+TAXI\s+[A-Z0-9]{2,10}\s+TO\s+[A-Z0-9_]{2,10}$",
         r"ATC\s+TAKEOFF\s+[A-Z0-9]{2,10}$",
+        r"ATC\s+PASS$",
     ]
 
     def __init__(self, weight: float = 1.0):
@@ -101,6 +102,10 @@ class ComplianceRubric(BaseRubric):
         for cmd_str in action.commands:
             # Basic validation
             if not self._is_valid_command_format(cmd_str):
+                continue
+
+            # Special case: Global PASS is neutral (0 reward)
+            if cmd_str.strip().upper() == "ATC PASS":
                 continue
 
             callsign_match = re.search(r"[A-Z0-9]{2,10}", cmd_str)
