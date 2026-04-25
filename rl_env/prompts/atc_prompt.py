@@ -11,6 +11,9 @@ def _load_command_reference() -> str:
     """Load authoritative ATC command documentation from repository root."""
     reference_path = Path(__file__).resolve().parents[2] / "ATC_COMMAND_REFERENCE.md"
     try:
+        import os
+        if os.environ.get("USE_FULL_REFERENCE", "0") == "0":
+            raise FileNotFoundError("Forcing lightweight reference to prevent CUDA OOM")
         return reference_path.read_text(encoding="utf-8").strip()
     except (FileNotFoundError, OSError):
         return (
