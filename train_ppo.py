@@ -9,7 +9,7 @@ import math
 import sys
 from typing import Optional
 
-from transformers import AutoTokenizer, AutoConfig
+from transformers import AutoTokenizer, AutoConfig, BitsAndBytesConfig
 from peft import LoraConfig
 from trl import AutoModelForCausalLMWithValueHead, PPOConfig, PPOTrainer
 
@@ -217,36 +217,33 @@ def main() -> None:
         print(f"Warning: Failed to load/patch config: {exc}", file=sys.stderr, flush=True)
         config = None
 
+    # QLoRA 4-bit Quantization to fit 4B parameters perfectly onto a 16GB Colab T4
+    print("Initializing 4-bit BitsAndBytes quantization...", file=sys.stderr, flush=True)
+    quantization_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_use_double_quant=True,
+    )
+
     # Active Policy Model
     try:
         model = AutoModelForCausalLMWithValueHead.from_pretrained(
             ppo_config.model_name,
             config=config,
             peft_config=lora_config,
-            device_map="auto",
+            quantization_config=quantization_config,
+            device_map="cuda",  # Force to GPU strictly, prevent CPU offloading!
             trust_remote_code=True
         )
     except Exception as exc:
         print(f"FATAL: Failed to initialize Policy model: {exc}", file=sys.stderr, flush=True)
         sys.exit(1)
     
-    # Reference Model (Keep frozen for KL divergence)
-    try:
-        ref_model = AutoModelForCausalLMWithValueHead.from_pretrained(
-            ppo_config.model_name,
-            config=config,
-            peft_config=lora_config,
-            device_map="auto",
-            trust_remote_code=True
-        )
-    except Exception as exc:
-        print(f"FATAL: Failed to initialize Reference model: {exc}", file=sys.stderr, flush=True)
-        sys.exit(1)
-
     ppo_trainer = PPOTrainer(
         config=ppo_config,
         model=model,
-        ref_model=ref_model,
+        ref_model=None, # TRL will automatically use the un-adapted PEFT base model to compute KL!
         tokenizer=tokenizer,
     )
 
