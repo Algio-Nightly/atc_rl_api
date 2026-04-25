@@ -172,6 +172,10 @@ def build_commands_from_response(llm_text: str) -> tuple[list[str], Optional[str
         items = parsed if isinstance(parsed, list) else [parsed]
 
         for cmd in items:
+            if cmd['command'] == 'PASS':
+                commands.append("ATC PASS")
+                continue
+
             cmd_str = f"ATC {cmd['command']} {cmd['callsign']}"
             for key in ("heading", "altitude", "speed", "waypoint", "runway"):
                 if key in cmd:

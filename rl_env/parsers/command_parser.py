@@ -120,14 +120,23 @@ def _parse_single_line(line: str, original_input: str) -> dict:
             raw_input=original_input,
         )
 
+    # PASS command: ATC PASS (Sectoral, no callsign required)
+    if command == "PASS":
+        return {
+            "command": "PASS",
+        }
+
+    # All other commands require at least a callsign
+    if len(parts) < 3:
+        raise ParseError(
+            f"'{command}' command requires a callsign. Format: ATC {command} <CALLSIGN> [PARAMETERS]",
+            raw_input=original_input,
+        )
+
+    callsign = parts[2]
+
     # ALTITUDE, SPEED, DIRECT, LAND, TAXI require callsign + parameter
     if command in ("ALTITUDE", "SPEED", "DIRECT", "LAND", "TAXI"):
-        if len(parts) < 3:
-            raise ParseError(
-                f"'{command}' command requires callsign and value. Format: ATC {command} <CALLSIGN> <VALUE>",
-                raw_input=original_input,
-            )
-        callsign = parts[2]
         value = parts[3] if len(parts) > 3 else None
 
         if value is None:
@@ -169,12 +178,6 @@ def _parse_single_line(line: str, original_input: str) -> dict:
 
     # HOLD command: ATC HOLD <CALLSIGN> [WAYPOINT] [ALTITUDE]
     elif command == "HOLD":
-        if len(parts) < 3:
-            raise ParseError(
-                f"'HOLD' command requires callsign. Format: ATC HOLD <CALLSIGN> [WAYPOINT] [ALTITUDE]",
-                raw_input=original_input,
-            )
-        callsign = parts[2]
         waypoint = parts[3] if len(parts) > 3 else None
         altitude = parts[4] if len(parts) > 4 else None
 
@@ -190,23 +193,15 @@ def _parse_single_line(line: str, original_input: str) -> dict:
 
         return result
 
-    # PASS command: ATC PASS (Sectoral, no callsign required)
-    elif command == "PASS":
-        return {
-            "command": "PASS",
-        }
-
-    # APPROACH, RESUME, LINE_UP, and TAKEOFF commands: only require callsign
+    # RESUME and TAKEOFF commands: only require callsign
     elif command in ("RESUME", "TAKEOFF"):
-        if len(parts) < 3:
-            raise ParseError(
-                f"'{command}' command requires callsign. Format: ATC {command} <CALLSIGN>",
-                raw_input=original_input,
-            )
         return {
             "command": command,
-            "callsign": parts[2],
+            "callsign": callsign,
         }
+
+    # Should not reach here since we validate command earlier
+    raise ParseError(f"Unhandled command: '{command}'", raw_input=original_input)
 
     # Should not reach here since we validate command earlier
     raise ParseError(f"Unhandled command: '{command}'", raw_input=original_input)
