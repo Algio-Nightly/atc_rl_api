@@ -9,7 +9,7 @@ import math
 import sys
 from typing import Optional
 
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, AutoConfig
 from peft import LoraConfig
 from trl import AutoModelForCausalLMWithValueHead, PPOConfig, PPOTrainer
 
@@ -202,10 +202,26 @@ def main() -> None:
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    # --- Custom Config Patch for TRL / Gemma 3 ---
+    # TRL's ValueHead expects 'hidden_size' but custom architectures often bury it 
+    # under different variable names, resulting in an UnboundLocalError.
+    print("Loading config and patching for TRL...", file=sys.stderr, flush=True)
+    try:
+        config = AutoConfig.from_pretrained(ppo_config.model_name, trust_remote_code=True)
+        if not hasattr(config, "hidden_size"):
+            # Attempt to map from standard alternate properties used by custom models
+            patched_size = getattr(config, "model_dim", getattr(config, "d_model", getattr(config, "n_embd", 3072)))
+            config.hidden_size = patched_size
+            print(f"Patched config.hidden_size to {patched_size}", file=sys.stderr, flush=True)
+    except Exception as exc:
+        print(f"Warning: Failed to load/patch config: {exc}", file=sys.stderr, flush=True)
+        config = None
+
     # Active Policy Model
     try:
         model = AutoModelForCausalLMWithValueHead.from_pretrained(
             ppo_config.model_name,
+            config=config,
             peft_config=lora_config,
             device_map="auto",
             trust_remote_code=True
@@ -218,6 +234,7 @@ def main() -> None:
     try:
         ref_model = AutoModelForCausalLMWithValueHead.from_pretrained(
             ppo_config.model_name,
+            config=config,
             peft_config=lora_config,
             device_map="auto",
             trust_remote_code=True
