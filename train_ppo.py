@@ -193,11 +193,11 @@ def main() -> None:
 
     print("Loading tokenizer and models (this may take a while)...", file=sys.stderr, flush=True)
     try:
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
     except Exception as e:
         print(f"Fast tokenizer failed to load ({e}). Falling back to slow tokenizer...", file=sys.stderr, flush=True)
         # Often happens with newer Gemma architectures if `transformers` or `tokenizers` library is outdated.
-        tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
+        tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False, trust_remote_code=True)
         
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -207,7 +207,8 @@ def main() -> None:
         model = AutoModelForCausalLMWithValueHead.from_pretrained(
             ppo_config.model_name,
             peft_config=lora_config,
-            device_map="auto"
+            device_map="auto",
+            trust_remote_code=True
         )
     except Exception as exc:
         print(f"FATAL: Failed to initialize Policy model: {exc}", file=sys.stderr, flush=True)
@@ -218,7 +219,8 @@ def main() -> None:
         ref_model = AutoModelForCausalLMWithValueHead.from_pretrained(
             ppo_config.model_name,
             peft_config=lora_config,
-            device_map="auto"
+            device_map="auto",
+            trust_remote_code=True
         )
     except Exception as exc:
         print(f"FATAL: Failed to initialize Reference model: {exc}", file=sys.stderr, flush=True)
