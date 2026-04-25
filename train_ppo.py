@@ -211,8 +211,12 @@ def main() -> None:
     try:
         config = AutoConfig.from_pretrained(ppo_config.model_name, trust_remote_code=True)
         if not hasattr(config, "hidden_size"):
-            # Attempt to map from standard alternate properties used by custom models
-            patched_size = getattr(config, "model_dim", getattr(config, "d_model", getattr(config, "n_embd", 3072)))
+            # Attempt to map from text_config for multimodal models like Gemma 3
+            if hasattr(config, "text_config") and hasattr(config.text_config, "hidden_size"):
+                patched_size = config.text_config.hidden_size
+            else:
+                # Fallback to alternate names or 2048 (default for Gemma 3 4B)
+                patched_size = getattr(config, "model_dim", getattr(config, "d_model", getattr(config, "n_embd", 2048)))
             config.hidden_size = patched_size
             print(f"Patched config.hidden_size to {patched_size}", file=sys.stderr, flush=True)
     except Exception as exc:
