@@ -169,7 +169,7 @@ def run_training_episode(
 def main() -> None:
     # We use Google's Gemma by default just as defined in inference.py 
     # Use 2b for training as it's easier to fit on standard GPUs
-    model_name = os.getenv("MODEL_NAME", "google/gemma-3n-E4B-it:together")
+    model_name = os.getenv("MODEL_NAME", "google/gemma-3n-E4B-it")
     epochs = int(os.getenv("EPOCHS", "10"))
     
     print(f"Loading configuration for PPO + LoRA on `{model_name}`...", file=sys.stderr, flush=True)
