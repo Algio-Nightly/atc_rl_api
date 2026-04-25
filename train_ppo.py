@@ -59,6 +59,8 @@ def run_training_episode(
     try:
         observation, _info = env.reset(task=task_name)
 
+        consecutive_errors = 0
+
         try:
             for step_num in range(1, MAX_STEPS_PER_EPISODE + 1):
                 steps_taken = step_num
@@ -101,6 +103,9 @@ def run_training_episode(
                     # Optional: Add penalty for failing to parse into PPO reward
                     if parse_error:
                         reward -= 0.5
+                        consecutive_errors += 1
+                    else:
+                        consecutive_errors = 0
 
                     rewards.append(reward)
                     queries.append(prompt_tensor)
@@ -115,6 +120,15 @@ def run_training_episode(
                     )
 
                     if done:
+                        break
+
+                    # Early termination logic for stagnating models
+                    if consecutive_errors >= 5:
+                        print(f"\n[Early Stop] 5 consecutive parse errors.", file=sys.stderr, flush=True)
+                        break
+
+                    if reward <= -2.0:
+                        print(f"\n[Early Stop] Extreme negative reward ({reward:.2f}).", file=sys.stderr, flush=True)
                         break
 
                 except Exception as exc:
@@ -148,19 +162,7 @@ def run_training_episode(
         except Exception:
             pass
 
-    score = normalize_score(sum(rewards), steps_taken)
-    success = score >= SUCCESS_SCORE_THRESHOLD
-
-    log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
-    
-    # Run PPO Update Step
-    stats = {}
-    if queries:
-        # Convert rewards list to list of tensors for TRL
-        reward_tensors = [torch.tensor(r, dtype=torch.float, device=device) for r in rewards]
-        stats = ppo_trainer.step(queries, responses, reward_tensors)
-        
-    return success, steps_taken, score, rewards, stats
+    return success, steps_taken, score, rewards, {}
 
 # ---------------------------------------------------------------------------
 # Main Training Loop
@@ -258,6 +260,12 @@ def main() -> None:
     # -----------------------------------------------------------------------
     # Run Training
     # -----------------------------------------------------------------------
+    
+    # Accumulators for batch updates
+    all_queries = []
+    all_responses = []
+    all_rewards = []
+
     for epoch in range(1, epochs + 1):
         print(f"\n=== EPOCH {epoch}/{epochs} ===", file=sys.stderr, flush=True)
         
@@ -265,25 +273,90 @@ def main() -> None:
         total_score = 0.0
 
         for task_name in TASKS:
-            ok, steps, score, episode_rewards, stats = run_training_episode(
-                env=env,
-                ppo_trainer=ppo_trainer,
-                tokenizer=tokenizer,
-                task_name=task_name
-            )
-            if ok:
-                successes += 1
-            total_score += score
+            # We need to manually run the episode step-by-step here to collect 
+            # query/response/reward lists for the TRL batch update.
+            device = ppo_trainer.accelerator.device
+            ep_rewards: list[float] = []
+            ep_queries: list[torch.Tensor] = []
+            ep_responses: list[torch.Tensor] = []
             
-            ppo_loss = stats.get("ppo/loss/total", 0.0)
-            mean_reward = sum(episode_rewards) / max(1, len(episode_rewards))
-            print(f"  -> Task '{task_name}': Score={score:.2f}, Mean Reward={mean_reward:.2f}, PPO Loss={ppo_loss:.4f}", file=sys.stderr, flush=True)
+            steps_taken = 0
+            score = 0.0
+            log_start(task=task_name, env=BENCHMARK_NAME, model=ppo_config.model_name)
+            
+            observation, _info = env.reset(task=task_name)
+            consecutive_errors = 0
+            done = False
+
+            for step_num in range(1, MAX_STEPS_PER_EPISODE + 1):
+                steps_taken = step_num
+                prompt = generate_atc_prompt(observation)
+                messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": prompt}]
+                text_prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+                prompt_tensor = tokenizer(text_prompt, return_tensors="pt").input_ids[0].to(device)
+
+                generation_kwargs = {"min_length": -1, "top_k": 0.0, "top_p": 1.0, "do_sample": True, "pad_token_id": tokenizer.pad_token_id, "max_new_tokens": 128}
+                response_tensors = ppo_trainer.generate([prompt_tensor], **generation_kwargs)
+                response_tensor = response_tensors[0][prompt_tensor.shape[0]:]
+                llm_text = tokenizer.decode(response_tensor, skip_special_tokens=True).strip()
+
+                commands, parse_error = build_commands_from_response(llm_text)
+                action = ATCAction(commands=commands)
+                action_str = "; ".join(commands) if commands else "NOOP"
+
+                try:
+                    observation, reward, done, _truncated, _info = env.step(action)
+                    if parse_error:
+                        reward -= 0.5
+                        consecutive_errors += 1
+                    else:
+                        consecutive_errors = 0
+
+                    ep_rewards.append(reward)
+                    ep_queries.append(prompt_tensor)
+                    ep_responses.append(response_tensor)
+
+                    log_step(step=step_num, action=action_str, reward=reward, done=done, error=parse_error)
+                    if done: break
+                    if consecutive_errors >= 5 or reward <= -2.0: break
+
+                except Exception as exc:
+                    ep_rewards.append(-1.0)
+                    ep_queries.append(prompt_tensor)
+                    ep_responses.append(response_tensor)
+                    log_step(step=step_num, action=action_str, reward=-1.0, done=True, error=f"step_error:{exc}")
+                    done = True
+                    break
+
+            score = normalize_score(sum(ep_rewards), steps_taken)
+            if score >= SUCCESS_SCORE_THRESHOLD: successes += 1
+            total_score += score
+            log_end(success=(score >= SUCCESS_SCORE_THRESHOLD), steps=steps_taken, score=score, rewards=ep_rewards)
+
+            # Move episode data to batch accumulators
+            all_queries.extend(ep_queries)
+            all_responses.extend(ep_responses)
+            all_rewards.extend([torch.tensor(r, dtype=torch.float, device=device) for r in ep_rewards])
+
+            # Trigger PPO update only when we have a full batch
+            while len(all_queries) >= ppo_config.batch_size:
+                curr_queries = all_queries[:ppo_config.batch_size]
+                curr_responses = all_responses[:ppo_config.batch_size]
+                curr_rewards = all_rewards[:ppo_config.batch_size]
+                
+                all_queries = all_queries[ppo_config.batch_size:]
+                all_responses = all_responses[ppo_config.batch_size:]
+                all_rewards = all_rewards[ppo_config.batch_size:]
+                
+                stats = ppo_trainer.step(curr_queries, curr_responses, curr_rewards)
+                ppo_loss = stats.get("ppo/loss/total", 0.0)
+                print(f"  -> Batch Update: PPO Loss={ppo_loss:.4f}", file=sys.stderr, flush=True)
 
         avg_score = total_score / len(TASKS) if TASKS else 0.0
-        
         print(f"\n--- Epoch {epoch} Summary ---", file=sys.stderr, flush=True)
         print(f"Tasks completed: {successes}/{len(TASKS)}", file=sys.stderr, flush=True)
         print(f"Average score:   {avg_score:.2f}", file=sys.stderr, flush=True)
+
         print(f"Total score:     {total_score:.2f}", file=sys.stderr, flush=True)
         
         # -----------------------------------------------------------------------

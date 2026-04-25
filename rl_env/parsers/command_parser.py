@@ -190,6 +190,12 @@ def _parse_single_line(line: str, original_input: str) -> dict:
 
         return result
 
+    # PASS command: ATC PASS (Sectoral, no callsign required)
+    elif command == "PASS":
+        return {
+            "command": "PASS",
+        }
+
     # APPROACH, RESUME, LINE_UP, and TAKEOFF commands: only require callsign
     elif command in ("RESUME", "TAKEOFF"):
         if len(parts) < 3:
@@ -200,12 +206,6 @@ def _parse_single_line(line: str, original_input: str) -> dict:
         return {
             "command": command,
             "callsign": parts[2],
-        }
-
-    # PASS command: ATC PASS (Sectoral, no callsign required)
-    elif command == "PASS":
-        return {
-            "command": "PASS",
         }
 
     # Should not reach here since we validate command earlier
