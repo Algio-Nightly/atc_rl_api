@@ -188,8 +188,8 @@ def main() -> None:
     ppo_config = PPOConfig(
         model_name=model_name,
         learning_rate=1e-5,
-        batch_size=8,
-        mini_batch_size=4,
+        batch_size=4,
+        mini_batch_size=2,
         gradient_accumulation_steps=2,
     )
 
@@ -347,6 +347,11 @@ def main() -> None:
                 all_queries = all_queries[ppo_config.batch_size:]
                 all_responses = all_responses[ppo_config.batch_size:]
                 all_rewards = all_rewards[ppo_config.batch_size:]
+                
+                # Clear VRAM before the expensive PPO forward/backward passes
+                import gc
+                gc.collect()
+                torch.cuda.empty_cache()
                 
                 stats = ppo_trainer.step(curr_queries, curr_responses, curr_rewards)
                 ppo_loss = stats.get("ppo/loss/total", 0.0)
