@@ -188,8 +188,8 @@ def main() -> None:
     ppo_config = PPOConfig(
         model_name=model_name,
         learning_rate=1e-5,
-        batch_size=4,
-        mini_batch_size=2,
+        batch_size=2,
+        mini_batch_size=1,
         gradient_accumulation_steps=2,
     )
 
@@ -241,6 +241,11 @@ def main() -> None:
     except Exception as exc:
         print(f"FATAL: Failed to initialize Policy model: {exc}", file=sys.stderr, flush=True)
         sys.exit(1)
+        
+    print("Enabling gradient checkpointing...", file=sys.stderr, flush=True)
+    if hasattr(model.pretrained_model, "gradient_checkpointing_enable"):
+        model.pretrained_model.config.use_cache = False
+        model.pretrained_model.gradient_checkpointing_enable()
     
     ppo_trainer = PPOTrainer(
         config=ppo_config,
