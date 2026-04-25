@@ -263,12 +263,20 @@ def main() -> None:
         print(f"Tasks completed: {successes}/{len(TASKS)}", file=sys.stderr, flush=True)
         print(f"Average score:   {avg_score:.2f}", file=sys.stderr, flush=True)
         print(f"Total score:     {total_score:.2f}", file=sys.stderr, flush=True)
+        
+        # -----------------------------------------------------------------------
+        # Save Intermediate Checkpoint
+        # -----------------------------------------------------------------------
+        checkpoint_dir = f"./atc_rl_lora_model_epoch_{epoch}"
+        print(f"Saving checkpoint to {checkpoint_dir}...", file=sys.stderr, flush=True)
+        model.save_pretrained(checkpoint_dir)
+        tokenizer.save_pretrained(checkpoint_dir)
 
     # -----------------------------------------------------------------------
-    # Save Model Weights
+    # Save Final Model Weights
     # -----------------------------------------------------------------------
-    out_dir = "./atc_rl_lora_model"
-    print(f"\nTraining completed. Saving adapter and tokenizer to {out_dir}...", file=sys.stderr, flush=True)
+    out_dir = "./atc_rl_lora_model_final"
+    print(f"\nTraining completed. Saving final adapter and tokenizer to {out_dir}...", file=sys.stderr, flush=True)
     model.save_pretrained(out_dir)
     tokenizer.save_pretrained(out_dir)
     print("Done!", file=sys.stderr, flush=True)
